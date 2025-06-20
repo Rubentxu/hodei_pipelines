@@ -7,6 +7,8 @@ dependencies {
     implementation(project(":backend:application"))
     
     implementation(libs.grpc.netty.shaded)
+    implementation(libs.grpc.protobuf)
+    implementation(libs.grpc.kotlin.stub)
     implementation(libs.kotlin.logging.jvm)
     implementation(libs.logback.classic)
     

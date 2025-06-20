@@ -11,7 +11,8 @@ class JobTest {
         val id = JobId("job-123")
         val definition = JobDefinition(
             name = "Test Job",
-            command = listOf("echo", "hello world")
+            command = listOf("echo", "hello world"),
+            workingDirectory = "/tmp"
         )
         
         val job = Job(
@@ -93,7 +94,8 @@ class JobTest {
             id = JobId("test-job"),
             definition = JobDefinition(
                 name = "Test Job",
-                command = listOf("echo", "test")
+                command = listOf("echo", "test"),
+                workingDirectory = "/tmp"
             )
         )
     }

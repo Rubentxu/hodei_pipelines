@@ -14,7 +14,7 @@ import java.util.UUID
 class CreateAndExecuteJobUseCase(
     private val jobRepository: JobRepository,
     private val workerRepository: WorkerRepository,
-    private val jobExecutionService: JobExecutionService,
+    private val jobExecutor: JobExecutor,
     private val eventPublisher: EventPublisher
 ) {
     
@@ -26,17 +26,31 @@ class CreateAndExecuteJobUseCase(
                 definition = request.jobDefinition
             )
             
-            val savedJob = jobRepository.save(job)
-            eventPublisher.publishJobEvent(JobDomainEvent.JobCreated(savedJob))
-            emit(JobExecutionResult.JobCreated(savedJob.id))
+            val saveResult = jobRepository.save(job)
+            if (saveResult.isFailure) {
+                emit(JobExecutionResult.JobFailed(job.id, "Failed to save job: ${saveResult.exceptionOrNull()?.message}"))
+                return@flow
+            }
+            
+            eventPublisher.publishJobEvent(JobDomainEvent.JobCreated(job))
+            emit(JobExecutionResult.JobCreated(job.id))
             
             // 2. Find available worker
-            val availableWorkers = workerRepository.findAvailableWorkers()
-            if (availableWorkers.isEmpty()) {
-                val failedJob = savedJob.fail("No available workers found", -1)
+            val workersResult = workerRepository.findAvailableWorkers()
+            if (workersResult.isFailure) {
+                val failedJob = job.fail("Failed to find workers: ${workersResult.exceptionOrNull()?.message}", -1)
                 jobRepository.save(failedJob)
                 eventPublisher.publishJobEvent(JobDomainEvent.JobFailed(failedJob))
-                emit(JobExecutionResult.JobFailed(savedJob.id, "No available workers found"))
+                emit(JobExecutionResult.JobFailed(job.id, "Failed to find workers"))
+                return@flow
+            }
+            
+            val availableWorkers = workersResult.getOrNull() ?: emptyList()
+            if (availableWorkers.isEmpty()) {
+                val failedJob = job.fail("No available workers found", -1)
+                jobRepository.save(failedJob)
+                eventPublisher.publishJobEvent(JobDomainEvent.JobFailed(failedJob))
+                emit(JobExecutionResult.JobFailed(job.id, "No available workers found"))
                 return@flow
             }
             
@@ -44,16 +58,16 @@ class CreateAndExecuteJobUseCase(
             val selectedWorker = availableWorkers.first()
             val busyWorker = selectedWorker.assignJob()
             workerRepository.save(busyWorker)
-            emit(JobExecutionResult.JobAssigned(savedJob.id, selectedWorker.id))
+            emit(JobExecutionResult.JobAssigned(job.id, selectedWorker.id))
             
             // 4. Execute job
-            val runningJob = savedJob.start()
+            val runningJob = job.start()
             jobRepository.save(runningJob)
             eventPublisher.publishJobEvent(JobDomainEvent.JobStarted(runningJob))
-            emit(JobExecutionResult.JobStarted(savedJob.id))
+            emit(JobExecutionResult.JobStarted(job.id))
             
             // 5. Monitor execution
-            jobExecutionService.executeJob(runningJob, selectedWorker.id).collect { event ->
+            jobExecutor.execute(runningJob, selectedWorker.id).collect { event ->
                 when (event) {
                     is JobExecutionEvent.Completed -> {
                         val completedJob = runningJob.complete(event.exitCode, event.output)
@@ -63,7 +77,7 @@ class CreateAndExecuteJobUseCase(
                         workerRepository.save(idleWorker)
                         
                         eventPublisher.publishJobEvent(JobDomainEvent.JobCompleted(completedJob))
-                        emit(JobExecutionResult.JobCompleted(savedJob.id, event.exitCode))
+                        emit(JobExecutionResult.JobCompleted(job.id, event.exitCode))
                     }
                     is JobExecutionEvent.Failed -> {
                         val failedJob = runningJob.fail(event.error, event.exitCode ?: -1)
@@ -73,10 +87,10 @@ class CreateAndExecuteJobUseCase(
                         workerRepository.save(idleWorker)
                         
                         eventPublisher.publishJobEvent(JobDomainEvent.JobFailed(failedJob))
-                        emit(JobExecutionResult.JobFailed(savedJob.id, event.error))
+                        emit(JobExecutionResult.JobFailed(job.id, event.error))
                     }
                     is JobExecutionEvent.OutputReceived -> {
-                        emit(JobExecutionResult.JobOutput(savedJob.id, String(event.chunk.data)))
+                        emit(JobExecutionResult.JobOutput(job.id, String(event.chunk.data)))
                     }
                     else -> {
                         // Handle other events if needed

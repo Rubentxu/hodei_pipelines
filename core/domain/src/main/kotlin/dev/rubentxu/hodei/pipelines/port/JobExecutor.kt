@@ -9,9 +9,9 @@ import kotlinx.coroutines.flow.Flow
  * Port (Output) - Job Execution Service
  * Handles the actual execution of jobs on workers
  */
-interface JobExecutionService {
-    suspend fun executeJob(job: Job, workerId: WorkerId): Flow<JobExecutionEvent>
-    suspend fun cancelJob(jobId: JobId): Boolean
+interface JobExecutor {
+    suspend fun execute(job: Job, workerId: WorkerId): Flow<JobExecutionEvent>
+    suspend fun sendSignal(jobId: JobId, signal: ExecutionSignal): Boolean
     suspend fun getJobOutput(jobId: JobId): Flow<JobOutputChunk>
 }
 
@@ -25,6 +25,16 @@ sealed class JobExecutionEvent {
     data class Failed(val jobId: JobId, val error: String, val exitCode: Int?) : JobExecutionEvent()
     data class Cancelled(val jobId: JobId) : JobExecutionEvent()
 }
+
+enum class ExecutionSignal {
+    START,
+    STOP,
+    PAUSE,
+    RESUME,
+    CANCEL
+}
+
+
 
 /**
  * Job Output Chunk

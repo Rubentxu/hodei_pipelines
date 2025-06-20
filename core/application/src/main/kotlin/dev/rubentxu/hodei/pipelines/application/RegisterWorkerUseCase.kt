@@ -19,23 +19,26 @@ class RegisterWorkerUseCase(
             val worker = Worker(
                 id = WorkerId(UUID.randomUUID().toString()),
                 name = request.name,
-                capabilities = WorkerCapabilities(
-                    os = request.os,
-                    arch = request.arch,
-                    maxConcurrentJobs = request.maxConcurrentJobs
-                )
+                capabilities = WorkerCapabilities.builder()
+                    .os(request.os)
+                    .arch(request.arch)
+                    .maxConcurrentJobs(request.maxConcurrentJobs)
+                    .build()
             )
             
             // Save worker
-            val savedWorker = workerRepository.save(worker)
+            val saveResult = workerRepository.save(worker)
+            if (saveResult.isFailure) {
+                return RegisterWorkerResponse.failure("Failed to save worker: ${saveResult.exceptionOrNull()?.message}")
+            }
             
             // Publish event
-            eventPublisher.publishWorkerEvent(WorkerDomainEvent.WorkerRegistered(savedWorker))
+            eventPublisher.publishWorkerEvent(WorkerDomainEvent.WorkerRegistered(worker))
             
             // Generate session token (simplified for MVP)
             val sessionToken = UUID.randomUUID().toString()
             
-            RegisterWorkerResponse.success(savedWorker.id, sessionToken)
+            RegisterWorkerResponse.success(worker.id, sessionToken)
             
         } catch (e: Exception) {
             RegisterWorkerResponse.failure("Failed to register worker: ${e.message}")

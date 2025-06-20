@@ -10,11 +10,11 @@ class WorkerTest {
     fun `should create worker with required fields`() {
         val id = WorkerId("worker-123")
         val name = "Test Worker"
-        val capabilities = WorkerCapabilities(
-            os = "linux",
-            arch = "x64",
-            maxConcurrentJobs = 5
-        )
+        val capabilities = WorkerCapabilities.builder()
+            .os("linux")
+            .arch("x64")
+            .maxConcurrentJobs(5)
+            .build()
         
         val worker = Worker(
             id = id,
@@ -78,11 +78,11 @@ class WorkerTest {
     
     @Test
     fun `should respect max concurrent jobs limit`() {
-        val capabilities = WorkerCapabilities(
-            os = "linux",
-            arch = "x64", 
-            maxConcurrentJobs = 2
-        )
+        val capabilities = WorkerCapabilities.builder()
+            .os("linux")
+            .arch("x64")
+            .maxConcurrentJobs(2)
+            .build()
         val worker = Worker(
             id = WorkerId("test"),
             name = "Test",
@@ -126,11 +126,11 @@ class WorkerTest {
         return Worker(
             id = WorkerId("test-worker"),
             name = "Test Worker",
-            capabilities = WorkerCapabilities(
-                os = "linux",
-                arch = "x64",
-                maxConcurrentJobs = 5
-            )
+            capabilities = WorkerCapabilities.builder()
+                .os("linux")
+                .arch("x64")
+                .maxConcurrentJobs(5)
+                .build()
         )
     }
 }

@@ -14,13 +14,13 @@ class CreateAndExecuteJobUseCaseTest {
     
     private val jobRepository = mockk<JobRepository>()
     private val workerRepository = mockk<WorkerRepository>()
-    private val jobExecutionService = mockk<JobExecutionService>()
+    private val jobExecutor = mockk<JobExecutor>()
     private val eventPublisher = mockk<EventPublisher>()
     
     private val useCase = CreateAndExecuteJobUseCase(
         jobRepository = jobRepository,
         workerRepository = workerRepository,
-        jobExecutionService = jobExecutionService,
+        jobExecutor = jobExecutor,
         eventPublisher = eventPublisher
     )
     
@@ -29,13 +29,18 @@ class CreateAndExecuteJobUseCaseTest {
         // Given
         val jobDefinition = JobDefinition(
             name = "Test Job",
-            command = listOf("echo", "hello world")
+            command = listOf("echo", "hello world"),
+            workingDirectory = "/tmp"
         )
         
         val worker = Worker(
             id = WorkerId("worker-1"),
             name = "Test Worker",
-            capabilities = WorkerCapabilities("linux", "x64", 1)
+            capabilities = WorkerCapabilities.builder()
+                .os("linux")
+                .arch("x64")
+                .maxConcurrentJobs(1)
+                .build()
         )
         
         val job = Job(
@@ -43,10 +48,10 @@ class CreateAndExecuteJobUseCaseTest {
             definition = jobDefinition
         )
         
-        coEvery { jobRepository.save(any()) } returns job
-        coEvery { workerRepository.findAvailableWorkers() } returns listOf(worker)
-        coEvery { workerRepository.save(any()) } returns worker.assignJob()
-        coEvery { jobExecutionService.executeJob(any(), any()) } returns flowOf(
+        coEvery { jobRepository.save(any()) } returns Result.success(job.id)
+        coEvery { workerRepository.findAvailableWorkers() } returns Result.success(listOf(worker))
+        coEvery { workerRepository.save(any()) } returns Result.success(worker.assignJob().id)
+        coEvery { jobExecutor.execute(any(), any()) } returns flowOf(
             JobExecutionEvent.Started(job.id, worker.id),
             JobExecutionEvent.Completed(job.id, 0, "hello world")
         )
@@ -64,7 +69,7 @@ class CreateAndExecuteJobUseCaseTest {
         
         coVerify { jobRepository.save(any()) }
         coVerify { workerRepository.findAvailableWorkers() }
-        coVerify { jobExecutionService.executeJob(any(), any()) }
+        coVerify { jobExecutor.execute(any(), any()) }
         coVerify { eventPublisher.publishJobEvent(any()) }
     }
     
@@ -73,13 +78,14 @@ class CreateAndExecuteJobUseCaseTest {
         // Given
         val jobDefinition = JobDefinition(
             name = "Test Job", 
-            command = listOf("echo", "hello")
+            command = listOf("echo", "hello"),
+            workingDirectory = "/tmp"
         )
         
         val job = Job(id = JobId("job-1"), definition = jobDefinition)
         
-        coEvery { jobRepository.save(any()) } returns job
-        coEvery { workerRepository.findAvailableWorkers() } returns emptyList()
+        coEvery { jobRepository.save(any()) } returns Result.success(job.id)
+        coEvery { workerRepository.findAvailableWorkers() } returns Result.success(emptyList())
         coEvery { eventPublisher.publishJobEvent(any()) } just Runs
         
         // When

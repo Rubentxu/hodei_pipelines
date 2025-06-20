@@ -10,9 +10,9 @@ import kotlinx.coroutines.flow.Flow
  * Follows hexagonal architecture principles - domain defines the contract
  */
 interface JobRepository {
-    suspend fun save(job: Job): Job
-    suspend fun findById(id: JobId): Job?
-    suspend fun findByStatus(status: JobStatus): List<Job>
+    suspend fun save(job: Job): Result<JobId> // Result<JobId> instead of Job
+    suspend fun findById(id: JobId): Result<Job> // Result<Job> instead of Job?
+    suspend fun findByStatus(status: JobStatus): Result<List<Job>>
     suspend fun findAll(): Flow<Job>
     suspend fun delete(id: JobId): Boolean
     suspend fun existsById(id: JobId): Boolean
