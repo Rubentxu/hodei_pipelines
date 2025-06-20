@@ -4,13 +4,15 @@ plugins {
 
 dependencies {
     implementation(project(":core:infrastructure"))
-    implementation(project(":backend:application"))
+    implementation(project(":core:application"))
+    implementation(project(":core:domain"))
     
     implementation(libs.grpc.netty.shaded)
     implementation(libs.grpc.protobuf)
     implementation(libs.grpc.kotlin.stub)
     implementation(libs.kotlin.logging.jvm)
     implementation(libs.logback.classic)
+    implementation(libs.kotlinx.coroutines.core)
     
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)

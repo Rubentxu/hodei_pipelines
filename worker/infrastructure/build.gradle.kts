@@ -4,7 +4,6 @@ plugins {
 
 dependencies {
     implementation(project(":core:infrastructure"))
-    implementation(project(":worker:application"))
     
     implementation(libs.grpc.netty.shaded)
     implementation(libs.kotlin.scripting.jvm)
