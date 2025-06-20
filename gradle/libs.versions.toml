@@ -13,7 +13,7 @@ kotlinxCoroutinesCore = "1.10.2"
 kotlinxCoroutinesTest = "1.10.2"
 kotlinxSerializationJson = "1.8.1"
 ktlintGradlePlugin = "12.3.0"
-grpc = "1.64.0"
+grpc = "1.73.0"
 grpcKotlin = "1.4.3"
 protobuf = "4.31.1"
 protobufPlugin = "0.9.5"
@@ -31,9 +31,12 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 grpc-protobuf = { module = "io.grpc:grpc-protobuf", version.ref = "grpc" }
 grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "grpc" }
+grpc-context = { module = "io.grpc:grpc-context", version.ref = "grpc" }
 grpc-kotlin-stub = { module = "io.grpc:grpc-kotlin-stub", version.ref = "grpcKotlin" }
 protobuf-kotlin = { module = "com.google.protobuf:protobuf-kotlin", version.ref = "protobuf" }
 grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded", version.ref = "grpc" }
+kotlin-logging-jvm = { module = "io.github.microutils:kotlin-logging-jvm", version = "3.0.5" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version = "1.4.14" }
 
 protoc = { group = "com.google.protobuf", name = "protoc", version.ref = "protobuf" }
 

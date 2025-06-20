@@ -1,16 +1,10 @@
 rootProject.name = "hodei-pipelines"
 
 include(
-    ":backend:app",
-    ":backend:application",
-    ":backend:domain",
-    ":backend:infrastructure",
-    ":worker:app",
-    ":worker:application",
-    ":worker:domain",
-    ":worker:infrastructure",
-    ":core:app",
-    ":core:application",
     ":core:domain",
-    ":core:infrastructure"
+    ":core:application", 
+    ":backend:application",
+    ":backend:infrastructure",
+    ":worker:application",
+    ":worker:infrastructure"
 )
