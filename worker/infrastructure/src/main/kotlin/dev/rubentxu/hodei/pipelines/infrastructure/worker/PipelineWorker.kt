@@ -13,6 +13,7 @@ import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import mu.KotlinLogging
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
@@ -32,6 +33,7 @@ class PipelineWorker(
     )
 ) {
     
+    private val logger = KotlinLogging.logger {}
     private val channel: ManagedChannel = ManagedChannelBuilder
         .forAddress(serverHost, serverPort)
         .usePlaintext()
@@ -45,8 +47,10 @@ class PipelineWorker(
     private var isRunning = false
     
     suspend fun start() {
-        println("Starting Pipeline Worker: $workerName ($workerId)")
-        
+        logger.info { "Starting Pipeline Worker: $workerName ($workerId)" }
+        logger.info { "Connecting to Hodei Pipelines server at $serverHost:$serverPort" }
+        logger.info { "Worker capabilities: $capabilities" }
+
         // Register with server
         if (registerWithServer()) {
             isRunning = true
@@ -61,8 +65,8 @@ class PipelineWorker(
                 listenForJobs()
             }
             
-            println("Worker started successfully. Waiting for jobs...")
-            
+            logger.info { "Worker started successfully. Ready to receive jobs." }
+
             // Wait for shutdown
             try {
                 joinAll(heartbeatJob, jobListenerJob)
@@ -70,35 +74,41 @@ class PipelineWorker(
                 stop()
             }
         } else {
-            println("Failed to register worker with server")
+            logger.error { "Failed to register worker with server - check network connectivity and server status" }
         }
     }
     
     suspend fun stop() {
-        println("Stopping Pipeline Worker...")
+        logger.info { "Stopping Pipeline Worker: $workerName ($workerId)" }
         isRunning = false
         
         try {
             // Unregister from server
+            logger.debug { "Unregistering worker from server" }
             workerManagementStub.unregisterWorker(
                 WorkerIdentifier.newBuilder()
                     .setValue(workerId)
                     .build()
             )
+            logger.debug { "Worker successfully unregistered from server" }
         } catch (e: Exception) {
-            println("Error during unregistration: ${e.message}")
+            logger.error(e) { "Error during worker unregistration: ${e.message}" }
         }
         
         channel.shutdown()
+        logger.debug { "Waiting for gRPC channel to terminate..." }
         if (!channel.awaitTermination(5, TimeUnit.SECONDS)) {
+            logger.warn { "gRPC channel did not terminate gracefully, forcing shutdown" }
             channel.shutdownNow()
         }
         
-        println("Worker stopped")
+        logger.info { "Worker stopped completely" }
     }
     
     private suspend fun registerWithServer(): Boolean {
         return try {
+            logger.info { "Registering worker with server - ID: $workerId, Name: $workerName" }
+
             val request = WorkerRegistrationRequest.newBuilder()
                 .setWorkerId(WorkerIdentifier.newBuilder().setValue(workerId).build())
                 .setWorkerName(workerName)
@@ -108,23 +118,25 @@ class PipelineWorker(
                 .setMaxConcurrentJobs(capabilities["maxConcurrentJobs"]?.toIntOrNull() ?: 5)
                 .build()
             
+            logger.debug { "Sending worker registration request" }
             val response = workerManagementStub.registerWorker(request)
             
             if (response.success) {
                 sessionToken = response.sessionToken
-                println("Worker registered successfully. Session token: ${sessionToken}")
+                logger.info { "Worker registered successfully with session token: ${sessionToken?.take(8)}..." }
                 true
             } else {
-                println("Worker registration failed: ${response.message}")
+                logger.warn { "Worker registration rejected: ${response.message}" }
                 false
             }
         } catch (e: Exception) {
-            println("Error during registration: ${e.message}")
+            logger.error(e) { "Failed to register worker with server: ${e.message}" }
             false
         }
     }
     
     private suspend fun startHeartbeat() {
+        logger.info { "Starting worker heartbeat service" }
         while (isRunning) {
             try {
                 val heartbeat = WorkerHeartbeat.newBuilder()
@@ -137,37 +149,42 @@ class PipelineWorker(
                         .build())
                     .build()
                 
+                logger.debug { "Sending heartbeat to server" }
                 workerManagementStub.sendHeartbeat(heartbeat)
                 
                 delay(30_000) // Send heartbeat every 30 seconds
             } catch (e: Exception) {
-                println("Heartbeat failed: ${e.message}")
+                logger.warn(e) { "Heartbeat failed: ${e.message} - will retry in 5 seconds" }
                 delay(5_000) // Retry after 5 seconds on failure
             }
         }
+        logger.debug { "Heartbeat service stopped" }
     }
     
     private suspend fun listenForJobs() {
         // For MVP, we'll implement a simple polling mechanism
         // In a real implementation, this would be a bidirectional gRPC stream
         
+        logger.info { "Starting job listener service" }
         while (isRunning) {
             try {
                 // Simulate receiving job (in real implementation, this would come from gRPC stream)
                 // For now, we'll create a demo job every 60 seconds for testing
-                println("Worker ready to receive jobs...")
+                logger.debug { "Worker ready and polling for new jobs" }
                 delay(60_000)
                 
             } catch (e: Exception) {
-                println("Error in job listener: ${e.message}")
+                logger.error(e) { "Error in job listener: ${e.message} - will retry in 5 seconds" }
                 delay(5_000)
             }
         }
+        logger.debug { "Job listener service stopped" }
     }
     
     suspend fun executeJobRequest(request: ExecuteJobRequest): Flow<JobOutputAndStatus> = flow {
-        println("Executing job: ${request.jobDefinition.name}")
-        
+        logger.info { "Received job execution request: ${request.jobDefinition.id.value} - ${request.jobDefinition.name}" }
+        logger.debug { "Job parameters: workDir=${request.jobDefinition.workingDirectory}, commands=${request.jobDefinition.commandList}" }
+
         try {
             // Convert gRPC request to domain job
             val job = Job(
@@ -183,15 +200,18 @@ class PipelineWorker(
                 )
             )
             
+            logger.info { "Starting job execution: ID=${job.id.value}, Name=${job.definition.name}" }
+
             // Execute using script executor
             scriptExecutor.execute(job, WorkerId(workerId)).collect { event ->
                 when (event) {
                     is JobExecutionEvent.Started -> {
+                        logger.info { "Job ${job.id.value} execution started" }
                         emit(JobOutputAndStatus.newBuilder()
                             .setStatusUpdate(JobExecutionStatus.newBuilder()
                                 .setJobId(JobIdentifier.newBuilder().setValue(job.id.value).build())
                                 .setStatus(dev.rubentxu.hodei.pipelines.proto.JobStatus.JOB_STATUS_RUNNING)
-                                .setMessage("Job started")
+                                .setMessage("Job execution started")
                                 .build())
                             .build())
                     }
@@ -199,6 +219,7 @@ class PipelineWorker(
                     is JobExecutionEvent.Completed -> {
                         // Send any output chunks first
                         if (event.output.isNotEmpty()) {
+                            logger.debug { "Sending job output chunk (${event.output.length} bytes)" }
                             emit(JobOutputAndStatus.newBuilder()
                                 .setOutputChunk(JobOutputChunk.newBuilder()
                                     .setJobId(JobIdentifier.newBuilder().setValue(job.id.value).build())
@@ -213,6 +234,7 @@ class PipelineWorker(
                         }
                         
                         // Send completion status
+                        logger.info { "Job ${job.id.value} completed successfully with exit code: ${event.exitCode}" }
                         emit(JobOutputAndStatus.newBuilder()
                             .setStatusUpdate(JobExecutionStatus.newBuilder()
                                 .setJobId(JobIdentifier.newBuilder().setValue(job.id.value).build())
@@ -224,6 +246,7 @@ class PipelineWorker(
                     }
                     
                     is JobExecutionEvent.Failed -> {
+                        logger.error { "Job ${job.id.value} execution failed: ${event.error}" }
                         emit(JobOutputAndStatus.newBuilder()
                             .setStatusUpdate(JobExecutionStatus.newBuilder()
                                 .setJobId(JobIdentifier.newBuilder().setValue(job.id.value).build())
@@ -235,12 +258,13 @@ class PipelineWorker(
                     }
                     
                     else -> {
-                        // Handle other event types if needed
+                        logger.debug { "Received unhandled event type: ${event::class.simpleName}" }
                     }
                 }
             }
             
         } catch (e: Exception) {
+            logger.error(e) { "Unhandled exception during job execution: ${request.jobDefinition.id.value} - ${e.message}" }
             emit(JobOutputAndStatus.newBuilder()
                 .setStatusUpdate(JobExecutionStatus.newBuilder()
                     .setJobId(JobIdentifier.newBuilder().setValue(request.jobDefinition.id.value).build())
@@ -254,6 +278,7 @@ class PipelineWorker(
     
     private fun createDefaultScript(jobDefinition: dev.rubentxu.hodei.pipelines.proto.JobDefinition): String {
         // Create a default Kotlin script based on the job definition
+        logger.debug { "Creating default script for job: ${jobDefinition.name}" }
         return """
             tasks.register("main") {
                 doLast {
@@ -273,29 +298,37 @@ class PipelineWorker(
  * Main function to start the worker
  */
 suspend fun main() {
+    val logger = KotlinLogging.logger {}
+    logger.info { "Initializing Hodei Pipelines Worker" }
+
     val workerId = System.getenv("WORKER_ID") ?: "worker-${System.currentTimeMillis()}"
     val workerName = System.getenv("WORKER_NAME") ?: "Pipeline Worker"
-    val serverHost = System.getenv("SERVER_HOST") ?: "localhost"
+    val serverHost = System.getenv("SERVER_HOST") ?: "127.0.0.1"
     val serverPort = System.getenv("SERVER_PORT")?.toIntOrNull() ?: 9090
-    
+
+    logger.info { "Worker configuration: ID=$workerId, Name=$workerName, Server=$serverHost:$serverPort" }
+
     val worker = PipelineWorker(
         workerId = workerId,
         workerName = workerName,
         serverHost = serverHost,
         serverPort = serverPort
     )
-    
+
     // Handle shutdown gracefully
     Runtime.getRuntime().addShutdownHook(Thread {
+        logger.info { "Received shutdown signal, initiating graceful shutdown" }
         runBlocking {
             worker.stop()
         }
+        logger.info { "Worker shutdown complete" }
     })
-    
+
     try {
+        logger.info { "Starting worker" }
         worker.start()
     } catch (e: Exception) {
-        println("Worker failed: ${e.message}")
+        logger.error(e) { "Worker failed with unhandled exception: ${e.message}" }
         e.printStackTrace()
     }
 }

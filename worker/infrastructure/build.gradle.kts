@@ -2,6 +2,10 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
+tasks.jar {
+    archiveBaseName.set("worker-infrastructure")
+}
+
 dependencies {
     implementation(project(":core:infrastructure"))
     
@@ -24,3 +28,4 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+

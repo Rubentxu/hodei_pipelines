@@ -31,6 +31,8 @@ allprojects {
         }
     }
 
+
+
 }
 
 tasks.register("allTests") {
@@ -45,3 +47,4 @@ tasks.register("allTests") {
         mustRunAfter(subproject.tasks.withType<Test>())
     }
 }
+

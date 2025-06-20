@@ -14,12 +14,34 @@ object PipelineWorkerApp {
     private val logger = KotlinLogging.logger {}
     
     fun run(args: Array<String>) {
+
         logger.info { "Starting Hodei Pipeline Worker..." }
         
         try {
             // Parse command line arguments and environment variables
             val config = parseConfiguration(args)
-            
+
+            val banner = """
+888    888               888          d8b      8888888b.                     .d88888b.                    
+888    888               888          Y8P      888  "Y88b                   d88P" "Y88b                   
+888    888               888                   888    888                   888     888                   
+8888888888  .d88b.   .d88888  .d88b.  888      888    888  .d88b.  888  888 888     888 88888b.  .d8888b  
+888    888 d88""88b d88" 888 d8P  Y8b 888      888    888 d8P  Y8b 888  888 888     888 888 "88b 88K      
+888    888 888  888 888  888 88888888 888      888    888 88888888 Y88  88P 888     888 888  888 "Y8888b. 
+888    888 Y88..88P Y88b 888 Y8b.     888      888  .d88P Y8b.      Y8bd8P  Y88b. .d88P 888 d88P      X88 
+888    888  "Y88P"   "Y88888  "Y8888  888      8888888P"   "Y8888    Y88P    "Y88888P"  88888P"   88888P' 
+                                                                                        888               
+                                                                                        888               
+                                                                                        888               
+
+    """.trimIndent()
+            println(banner)
+            println(" :: Hodei Pipeline Worker :: (v1.0.0)")
+            println(" >> Worker ID: $config.workerId")
+            println(" >> Connecting to server at $config.serverHost:$config.serverPort")
+            println()
+
+
             logger.info { "Worker Configuration:" }
             logger.info { "  Worker ID: ${config.workerId}" }
             logger.info { "  Worker Name: ${config.workerName}" }

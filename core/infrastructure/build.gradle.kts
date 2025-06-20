@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.protobuf)
 }
 
+tasks.jar {
+    archiveBaseName.set("core-infrastructure")
+}
+
 dependencies {
     api(project(":core:domain"))
     api(project(":core:application"))
@@ -12,6 +16,8 @@ dependencies {
     api(libs.grpc.stub)
     api(libs.grpc.kotlin.stub)
     api(libs.protobuf.kotlin)
+    implementation(libs.kotlin.logging.jvm)
+    implementation(libs.logback.classic)
     
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)

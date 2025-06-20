@@ -8,13 +8,16 @@ import dev.rubentxu.hodei.pipelines.infrastructure.repository.InMemoryWorkerRepo
 import dev.rubentxu.hodei.pipelines.infrastructure.service.InMemoryJobExecutor
 import dev.rubentxu.hodei.pipelines.infrastructure.service.InMemoryWorkerManagementService
 import dev.rubentxu.hodei.pipelines.port.*
+import mu.KotlinLogging
 
 /**
  * Configuration class for MVP with in-memory implementations
  * Provides dependency injection setup for all components
  */
 class InMemoryConfiguration {
-    
+
+    private val logger = KotlinLogging.logger {}
+
     // Repositories
     private val jobRepository: JobRepository = InMemoryJobRepository()
     private val workerRepository: WorkerRepository = InMemoryWorkerRepository()
@@ -37,6 +40,10 @@ class InMemoryConfiguration {
         eventPublisher = eventPublisher
     )
     
+    init {
+        logger.info { "In-memory configuration initialized" }
+    }
+
     // Expose components for direct access if needed
     fun getJobRepository(): JobRepository = jobRepository
     fun getWorkerRepository(): WorkerRepository = workerRepository

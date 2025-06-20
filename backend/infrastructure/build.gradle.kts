@@ -2,6 +2,10 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
+tasks.jar {
+    archiveBaseName.set("backend-infrastructure")
+}
+
 dependencies {
     implementation(project(":core:infrastructure"))
     implementation(project(":core:application"))

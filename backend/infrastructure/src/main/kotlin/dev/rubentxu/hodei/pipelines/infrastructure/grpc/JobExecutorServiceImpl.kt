@@ -78,6 +78,8 @@ class JobExecutorServiceImpl(
                     .setExitCode(1)
                     .build())
                 .build())
+        } finally {
+            logger.info { "Job execution stream completed" }
         }
     }
     

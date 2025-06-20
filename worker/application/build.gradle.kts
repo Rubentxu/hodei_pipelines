@@ -3,6 +3,10 @@ plugins {
     application
 }
 
+tasks.jar {
+    archiveBaseName.set("worker-application")
+}
+
 dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:application"))

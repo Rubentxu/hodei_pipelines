@@ -3,6 +3,10 @@ plugins {
     application
 }
 
+tasks.jar {
+    archiveBaseName.set("backend-application")
+}
+
 dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:application"))
@@ -12,6 +16,7 @@ dependencies {
     implementation(libs.grpc.netty.shaded)
     implementation(libs.kotlin.logging.jvm)
     implementation(libs.logback.classic)
+    implementation(libs.grpc.services)
     
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -42,6 +42,7 @@ grpc-context = { module = "io.grpc:grpc-context", version.ref = "grpc" }
 grpc-kotlin-stub = { module = "io.grpc:grpc-kotlin-stub", version.ref = "grpcKotlin" }
 protobuf-kotlin = { module = "com.google.protobuf:protobuf-kotlin", version.ref = "protobuf" }
 grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded", version.ref = "grpc" }
+grpc-services = { module = "io.grpc:grpc-services", version.ref = "grpc" }
 kotlin-logging-jvm = { module = "io.github.microutils:kotlin-logging-jvm", version = "3.0.5" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version = "1.4.14" }
 
