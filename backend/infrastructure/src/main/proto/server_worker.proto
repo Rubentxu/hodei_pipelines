@@ -1,0 +1,216 @@
+syntax = "proto3";
+
+package dev.rubentxu.hodei.pipelines.proto.v1;
+
+option java_multiple_files = true;
+option java_package = "dev.rubentxu.hodei.pipelines.proto";
+option java_outer_classname = "ServerWorkerProto";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/empty.proto";
+
+// Tipos de parámetros disponibles
+enum ParameterType {
+  PARAMETER_TYPE_UNSPECIFIED = 0;
+  PARAMETER_TYPE_STRING = 1;
+  PARAMETER_TYPE_TEXT = 2;
+  PARAMETER_TYPE_BOOLEAN = 3;
+  PARAMETER_TYPE_CHOICE = 4;
+  PARAMETER_TYPE_PASSWORD = 5;
+  PARAMETER_TYPE_FILE = 6;
+  PARAMETER_TYPE_ENVIRONMENT = 7;
+  PARAMETER_TYPE_JSON = 8;
+}
+
+message JobParameter {
+  string name = 1;
+  string description = 2;
+  ParameterType type = 3;
+  bool required = 4;
+  oneof value {
+    string string_value = 5;
+    string text_value = 6;
+    bool boolean_value = 7;
+    ChoiceParameter choice_value = 8;
+    string password_value = 9;
+    FileParameter file_value = 10;
+    google.protobuf.Struct json_value = 11;
+  }
+  map<string, string> metadata = 12; // Para metadatos adicionales específicos del tipo
+}
+
+message ChoiceParameter {
+  repeated string options = 1;
+  string selected_value = 2;
+}
+
+message FileParameter {
+  string file_name = 1;
+  bytes content = 2;
+  string content_type = 3;
+  int64 size = 4;
+  string path = 5; // Ruta al archivo en el sistema, alternativa a 'content'
+}
+
+enum JobStatus {
+  JOB_STATUS_UNSPECIFIED = 0;
+  JOB_STATUS_QUEUED = 1;
+  JOB_STATUS_RUNNING = 2;
+  JOB_STATUS_SUCCESS = 3;
+  JOB_STATUS_FAILED = 4;
+  JOB_STATUS_CANCELLED = 5;
+}
+
+// Enumeración para el estado de un Worker
+enum WorkerStatus {
+  WORKER_STATUS_UNSPECIFIED = 0;
+  WORKER_STATUS_PROVISIONING = 1;
+  WORKER_STATUS_READY = 2;
+  WORKER_STATUS_BUSY = 3;
+  WORKER_STATUS_TERMINATING = 4;
+  WORKER_STATUS_FAILED = 5;
+}
+
+// Mensajes de identificación
+message JobIdentifier {
+  string value = 1;
+}
+
+message WorkerIdentifier {
+  string value = 1;
+}
+
+// =====================================
+// Servicios para Ejecución de Jobs
+// =====================================
+
+// Mensaje para la definición de un Job
+message JobDefinition {
+  JobIdentifier id = 1;
+  string name = 2;
+  repeated string command = 3; // Comando y argumentos
+  map<string, string> environment = 4;
+  string working_directory = 5;
+  repeated JobParameter parameters = 6; // Añadidos los parámetros estructurados
+}
+
+// Mensaje para iniciar la ejecución de un Job
+message ExecuteJobRequest {
+  JobDefinition job_definition = 1;
+  JobExecutionMetadata config = 2;
+}
+
+message JobExecutionMetadata {
+  int32 timeout_seconds = 1;
+  int32 priority = 2;
+  bool capture_stdout = 3;
+  bool capture_stderr = 4;
+  int32 max_output_size = 5; // Tamaño máximo de salida a capturar (en KB)
+  map<string, string> labels = 6;
+}
+
+// Mensaje para la salida (stdout/stderr) de un Job
+message JobOutputChunk {
+  JobIdentifier job_id = 1;
+  bytes data = 2; // Chunk de datos (stdout/stderr)
+  bool is_stderr = 3; // True si es stderr, false si es stdout
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// Mensaje para el estado de ejecución de un Job en el Worker
+message JobExecutionStatus {
+  JobIdentifier job_id = 1;
+  JobStatus status = 2;
+  int32 exit_code = 3; // Código de salida del proceso
+  string message = 4; // Mensaje adicional (ej. error)
+  // Añadir métricas de monitoreo aquí si es necesario
+}
+
+// Servicio para la comunicación de ejecución de Jobs entre Server y Worker
+service JobExecutorService {
+  // Bi-directional stream para ejecutar un job, enviar entrada, y recibir salida y estado
+  rpc ExecuteJob (stream JobInputChunk) returns (stream JobOutputAndStatus);
+  // Unary call para solicitar la cancelación de un Job
+  rpc SendSignal (ControlSignal) returns (JobExecutionStatus);
+}
+
+// Mensaje para el input del Job (server a worker)
+message JobInputChunk {
+  oneof content {
+    ExecuteJobRequest init_request = 1;
+    JobParameter parameter = 2;
+  }
+}
+
+message ControlSignal {
+  enum SignalType {
+    SIGNAL_TYPE_UNSPECIFIED = 0;
+    SIGNAL_TYPE_CANCEL = 1; // Solicita la terminación limpia del job
+    SIGNAL_TYPE_PAUSE = 2;  // (Funcionalidad avanzada)
+    SIGNAL_TYPE_RESUME = 3; // (Funcionalidad avanzada)
+  }
+  SignalType type = 1;
+  string message = 2;
+}
+
+// Mensaje para la salida y estado del Job (worker a server)
+message JobOutputAndStatus {
+  oneof content {
+    JobOutputChunk output_chunk = 1; // Salida del Job
+    JobExecutionStatus status_update = 2; // Actualización de estado
+  }
+}
+
+// Servicio para gestión del ciclo de vida de workers
+service WorkerManagementService {
+  // Registrar un worker en el servidor
+  rpc RegisterWorker (WorkerRegistrationRequest) returns (WorkerRegistrationResponse);
+
+  // Enviar heartbeat periódico desde el worker
+  rpc SendHeartbeat (WorkerHeartbeat) returns (google.protobuf.Empty);
+
+  // Obtener información de un worker específico
+  rpc GetWorkerInfo (WorkerIdentifier) returns (WorkerInfo);
+
+  // Listar todos los workers registrados
+  rpc ListWorkers (google.protobuf.Empty) returns (stream WorkerInfo);
+
+  // Desregistrar un worker
+  rpc UnregisterWorker (WorkerIdentifier) returns (google.protobuf.Empty);
+}
+
+// Mensajes para gestión de workers
+message WorkerRegistrationRequest {
+  WorkerIdentifier worker_id = 1;
+  string worker_name = 2;
+  string auth_token = 3;
+  map<string, string> capabilities = 4;
+  string worker_version = 5;
+  int32 max_concurrent_jobs = 6;
+}
+
+message WorkerRegistrationResponse {
+  bool success = 1;
+  string message = 2;
+  string session_token = 3;
+  int32 heartbeat_interval_seconds = 4;
+}
+
+message WorkerHeartbeat {
+  WorkerIdentifier worker_id = 1;
+  WorkerStatus status = 2;
+  int32 active_jobs_count = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message WorkerInfo {
+  WorkerIdentifier id = 1;
+  string name = 2;
+  WorkerStatus status = 3;
+  map<string, string> capabilities = 4;
+  google.protobuf.Timestamp registered_at = 5;
+  google.protobuf.Timestamp last_heartbeat = 6;
+  int32 active_jobs_count = 7;
+  int32 max_concurrent_jobs = 8;
+}

@@ -24,6 +24,31 @@ dependencies {
     testImplementation(libs.mockk)
 }
 
+protobuf {
+    protoc {
+        artifact = libs.protoc.get().toString()
+    }
+    plugins {
+        create("grpc") {
+            artifact = libs.protoc.gen.grpc.java.get().toString()
+        }
+        create("grpckt") {
+            artifact = libs.protoc.gen.grpc.kotlin.get().toString() + ":jdk8@jar"
+        }
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.plugins {
+                create("grpc")
+                create("grpckt")
+            }
+            task.builtins {
+                create("kotlin")
+            }
+        }
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
 }
