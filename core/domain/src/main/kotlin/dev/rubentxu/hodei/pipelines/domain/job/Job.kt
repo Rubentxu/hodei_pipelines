@@ -72,7 +72,7 @@ data class Job(
     
     private fun validateTransition(newStatus: JobStatus) {
         val validTransitions = when (status) {
-            JobStatus.QUEUED -> setOf(JobStatus.RUNNING, JobStatus.CANCELLED)
+            JobStatus.QUEUED -> setOf(JobStatus.RUNNING, JobStatus.CANCELLED, JobStatus.FAILED)
             JobStatus.RUNNING -> setOf(JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED)
             JobStatus.COMPLETED -> emptySet()
             JobStatus.FAILED -> emptySet()
