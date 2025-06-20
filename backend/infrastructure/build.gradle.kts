@@ -14,6 +14,10 @@ dependencies {
     implementation(libs.logback.classic)
     implementation(libs.kotlinx.coroutines.core)
     
+    // Kubernetes client
+    implementation(libs.kubernetes.client)
+    implementation(libs.kubernetes.client.extended)
+    
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.junit.jupiter.api)

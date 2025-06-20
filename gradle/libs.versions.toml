@@ -18,6 +18,7 @@ grpcKotlin = "1.4.3"
 protobuf = "4.31.1"
 protobufPlugin = "0.9.5"
 osdetector = "1.7.3"
+kubernetesClient = "20.0.0"
 
 
 [libraries]
@@ -89,6 +90,10 @@ postgresql-driver = { module = "org.postgresql:postgresql", version.ref = "postg
 # Testcontainers
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainersJunitJupiter" }
+
+# Kubernetes
+kubernetes-client = { module = "io.kubernetes:client-java", version.ref = "kubernetesClient" }
+kubernetes-client-extended = { module = "io.kubernetes:client-java-extended", version.ref = "kubernetesClient" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
