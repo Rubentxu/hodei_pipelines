@@ -95,7 +95,7 @@ data class WorkerPool(
     fun updateWorkerStatus(workerId: WorkerId, status: dev.rubentxu.hodei.pipelines.domain.worker.WorkerStatus): WorkerPool {
         val updatedWorkers = workers.map { worker ->
             if (worker.id == workerId) {
-                worker.copy(status = status, lastSeen = Instant.now())
+                worker.copy(status = status)
             } else {
                 worker
             }
