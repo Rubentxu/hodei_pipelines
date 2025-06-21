@@ -30,6 +30,8 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.receiveAsFlow
 import mu.KotlinLogging
 import java.io.Closeable
+import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import dev.rubentxu.hodei.pipelines.proto.JobDefinition as GrpcJobDefinition
 
@@ -51,6 +53,18 @@ class PipelineWorker(
     private val workerManagementStub: WorkerManagementServiceCoroutineStub = WorkerManagementServiceCoroutineStub(channel)
 
     private val workerScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    
+    // Artifact management (Fase 1)
+    private val artifactCache = mutableMapOf<String, ArtifactDownload>()
+    private val artifactDirectory = File(System.getProperty("java.io.tmpdir"), "hodei-artifacts-$workerId")
+    
+    init {
+        // Create artifact directory
+        if (!artifactDirectory.exists()) {
+            artifactDirectory.mkdirs()
+            logger.info { "Created artifact directory: ${artifactDirectory.absolutePath}" }
+        }
+    }
 
     fun start() {
         logger.info { "Starting worker $workerId..." }
@@ -113,6 +127,18 @@ class PipelineWorker(
                                 val controlSignal = serverMessage.controlSignal
                                 logger.info { "Received control signal: ${controlSignal.type}" }
                                 // Handle control signals (e.g., cancel job)
+                            }
+                            ServerToWorker.MessageCase.ARTIFACT_CHUNK -> {
+                                val artifactChunk = serverMessage.artifactChunk
+                                logger.debug { "Received artifact chunk for ${artifactChunk.artifactId}, sequence ${artifactChunk.sequence}" }
+                                
+                                launch {
+                                    val ack = handleArtifactChunk(artifactChunk)
+                                    val ackMessage = WorkerToServer.newBuilder()
+                                        .setArtifactAck(ack)
+                                        .build()
+                                    toServerChannel.send(ackMessage)
+                                }
                             }
                             else -> {
                                 logger.warn { "Received unknown message from server: ${serverMessage.messageCase}" }
@@ -233,6 +259,101 @@ class PipelineWorker(
         }
         return scriptBuilder.toString()
     }
+    
+    /**
+     * Handle incoming artifact chunk (Fase 1: Basic implementation)
+     */
+    private suspend fun handleArtifactChunk(chunk: dev.rubentxu.hodei.pipelines.proto.ArtifactChunk): dev.rubentxu.hodei.pipelines.proto.ArtifactAck {
+        return try {
+            val artifactId = chunk.artifactId
+            
+            // Get or create artifact download state
+            val download = artifactCache.getOrPut(artifactId) {
+                ArtifactDownload(
+                    artifactId = artifactId,
+                    buffer = mutableListOf(),
+                    expectedChecksum = "" // We'll get this from metadata in future phases
+                )
+            }
+            
+            // Add chunk data to buffer
+            download.buffer.add(chunk.data.toByteArray())
+            
+            logger.debug { "Added chunk ${chunk.sequence} for artifact $artifactId (${chunk.data.size()} bytes)" }
+            
+            // If this is the last chunk, finalize the artifact
+            if (chunk.isLast) {
+                val success = finalizeArtifact(download)
+                
+                if (success) {
+                    // Calculate final checksum
+                    val finalData = download.buffer.flatMap { it.toList() }.toByteArray()
+                    val calculatedChecksum = calculateSha256(finalData)
+                    
+                    logger.info { "Successfully received artifact $artifactId (${finalData.size} bytes)" }
+                    
+                    // Remove from cache
+                    artifactCache.remove(artifactId)
+                    
+                    dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+                        .setArtifactId(artifactId)
+                        .setSuccess(true)
+                        .setMessage("Artifact received successfully")
+                        .setCalculatedChecksum(calculatedChecksum)
+                        .build()
+                } else {
+                    dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+                        .setArtifactId(artifactId)
+                        .setSuccess(false)
+                        .setMessage("Failed to finalize artifact")
+                        .build()
+                }
+            } else {
+                // Acknowledge chunk received
+                dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+                    .setArtifactId(artifactId)
+                    .setSuccess(true)
+                    .setMessage("Chunk ${chunk.sequence} received")
+                    .build()
+            }
+            
+        } catch (e: Exception) {
+            logger.error(e) { "Error handling artifact chunk for ${chunk.artifactId}" }
+            
+            dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+                .setArtifactId(chunk.artifactId)
+                .setSuccess(false)
+                .setMessage("Error: ${e.message}")
+                .build()
+        }
+    }
+    
+    /**
+     * Finalize artifact by writing to disk
+     */
+    private fun finalizeArtifact(download: ArtifactDownload): Boolean {
+        return try {
+            val finalData = download.buffer.flatMap { it.toList() }.toByteArray()
+            val artifactFile = File(artifactDirectory, "${download.artifactId}.artifact")
+            
+            artifactFile.writeBytes(finalData)
+            logger.info { "Artifact ${download.artifactId} saved to ${artifactFile.absolutePath}" }
+            
+            true
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to save artifact ${download.artifactId}" }
+            false
+        }
+    }
+    
+    /**
+     * Calculate SHA-256 checksum
+     */
+    private fun calculateSha256(data: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(data)
+        return hashBytes.joinToString("") { "%02x".format(it) }
+    }
 }
 
 // Mapper functions
@@ -262,3 +383,12 @@ fun DomainJobStatus.toGrpc(): dev.rubentxu.hodei.pipelines.proto.JobStatus {
         DomainJobStatus.CANCELLED -> dev.rubentxu.hodei.pipelines.proto.JobStatus.JOB_STATUS_CANCELLED
     }
 }
+
+/**
+ * Data class to manage artifact download state (Fase 1)
+ */
+data class ArtifactDownload(
+    val artifactId: String,
+    val buffer: MutableList<ByteArray>,
+    val expectedChecksum: String
+)

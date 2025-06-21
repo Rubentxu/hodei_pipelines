@@ -30,6 +30,17 @@ enum CompressionType {
   COMPRESSION_ZSTD = 2;
 }
 
+// Tipos de artefactos disponibles
+enum ArtifactType {
+  ARTIFACT_TYPE_UNSPECIFIED = 0;
+  ARTIFACT_TYPE_LIBRARY = 1;    // JAR, DLL, SO
+  ARTIFACT_TYPE_DATASET = 2;    // CSV, Parquet
+  ARTIFACT_TYPE_CONFIG = 3;     // Propiedades, YAML
+  ARTIFACT_TYPE_RESOURCE = 4;   // Otros recursos
+  ARTIFACT_TYPE_DOCKER_IMAGE = 5;  // Imágenes Docker
+  ARTIFACT_TYPE_ARCHIVE = 6;    // ZIP, TAR.GZ
+}
+
 message JobParameter {
   string name = 1;
   string description = 2;
@@ -130,6 +141,7 @@ message JobExecutionMetadata {
   repeated string allowed_roles = 7; // Roles autorizados para este job ["admin", "ci-engineer"]
   string run_as_user = 8; // Usuario para ejecución del job
   SecurityPolicy security_policy = 9; // Política de seguridad
+  repeated Artifact required_artifacts = 10; // Artefactos requeridos para el job
 }
 
 // Política de seguridad para jobs
@@ -139,6 +151,32 @@ message SecurityPolicy {
   repeated string allowed_domains = 3; // Dominios permitidos para acceso de red
   repeated string blocked_commands = 4; // Comandos bloqueados
   map<string, string> environment_restrictions = 5; // Restricciones de variables de entorno
+}
+
+// Definición de artefacto (Fase 1: Básico)
+message Artifact {
+  string id = 1; // Identificador único del artefacto
+  string name = 2; // Nombre del archivo/artefacto
+  ArtifactType type = 3; // Tipo de artefacto
+  int64 size = 4; // Tamaño en bytes
+  string checksum = 5; // SHA-256 para verificación de integridad
+  string path = 6; // Ruta donde debe guardarse en worker
+}
+
+// Chunk de datos de artefacto para transferencia (Fase 1: Sin compresión)
+message ArtifactChunk {
+  string artifact_id = 1; // ID del artefacto
+  bytes data = 2; // Datos del chunk
+  int32 sequence = 3; // Número de secuencia (0-based)
+  bool is_last = 4; // Indica si es el último chunk
+}
+
+// Confirmación de recepción de artefacto (Fase 1: Simple)
+message ArtifactAck {
+  string artifact_id = 1; // ID del artefacto
+  bool success = 2; // Si la recepción fue exitosa
+  string message = 3; // Mensaje de error en caso de fallo
+  string calculated_checksum = 4; // Checksum calculado por el worker
 }
 
 // Mensaje para la salida (stdout/stderr) de un Job
@@ -210,6 +248,7 @@ message ServerToWorker {
   oneof message {
     ExecuteJobRequest job_request = 1; // Un nuevo job para ejecutar
     ControlSignal control_signal = 2;  // Para enviar señales como "cancelar" o "shutdown"
+    ArtifactChunk artifact_chunk = 3;  // Chunk de artefacto para transferir
   }
 }
 
@@ -220,6 +259,8 @@ message WorkerToServer {
     JobOutputAndStatus job_output_and_status = 1;
     // Podríamos incluir aquí también el heartbeat para mantener el canal vivo
     WorkerHeartbeat heartbeat = 2;
+    // Confirmación de recepción de artefactos
+    ArtifactAck artifact_ack = 3;
   }
 }
 

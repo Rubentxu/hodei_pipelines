@@ -5,10 +5,13 @@ import dev.rubentxu.hodei.pipelines.domain.job.JobId
 import dev.rubentxu.hodei.pipelines.infrastructure.grpc.mappers.JobMappers
 import dev.rubentxu.hodei.pipelines.port.JobExecutor
 import dev.rubentxu.hodei.pipelines.proto.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import mu.KotlinLogging
+import java.io.File
+import java.security.MessageDigest
 
 /**
  * gRPC implementation of JobExecutorService
@@ -59,6 +62,19 @@ class JobExecutorServiceImpl(
                             val nextJob = jobQueue.removeFirst()
                             logger.info { "Assigning job ${nextJob.jobDefinition.name} to worker $workerId" }
                             
+                            // First, send artifacts if any
+                            if (nextJob.config.requiredArtifactsList.isNotEmpty()) {
+                                logger.info { "Transferring ${nextJob.config.requiredArtifactsList.size} artifacts for job ${nextJob.jobDefinition.name}" }
+                                
+                                for (artifact in nextJob.config.requiredArtifactsList) {
+                                    transferArtifactToWorker(artifact, this@flow)
+                                }
+                                
+                                // Small delay to ensure artifacts are processed before job starts
+                                delay(100)
+                            }
+                            
+                            // Then send the job request
                             emit(ServerToWorker.newBuilder()
                                 .setJobRequest(nextJob)
                                 .build())
@@ -91,6 +107,17 @@ class JobExecutorServiceImpl(
                                         val nextJob = jobQueue.removeFirst()
                                         logger.info { "Assigning next job ${nextJob.jobDefinition.name} to worker $workerId" }
                                         
+                                        // Transfer artifacts first if needed
+                                        if (nextJob.config.requiredArtifactsList.isNotEmpty()) {
+                                            logger.info { "Transferring ${nextJob.config.requiredArtifactsList.size} artifacts for next job" }
+                                            
+                                            for (artifact in nextJob.config.requiredArtifactsList) {
+                                                transferArtifactToWorker(artifact, this@flow)
+                                            }
+                                            
+                                            delay(100)
+                                        }
+                                        
                                         emit(ServerToWorker.newBuilder()
                                             .setJobRequest(nextJob)
                                             .build())
@@ -101,6 +128,21 @@ class JobExecutorServiceImpl(
                             else -> {
                                 logger.warn { "Received unknown job output content type: ${jobOutput.contentCase}" }
                             }
+                        }
+                    }
+                    
+                    WorkerToServer.MessageCase.ARTIFACT_ACK -> {
+                        val artifactAck = workerMessage.artifactAck
+                        if (artifactAck.success) {
+                            logger.info { "Artifact ${artifactAck.artifactId} transferred successfully to worker $workerId" }
+                            // Verify checksum matches
+                            if (artifactAck.calculatedChecksum.isNotEmpty()) {
+                                // In a real implementation, you'd verify against the expected checksum
+                                logger.debug { "Worker calculated checksum: ${artifactAck.calculatedChecksum}" }
+                            }
+                        } else {
+                            logger.error { "Artifact ${artifactAck.artifactId} transfer failed: ${artifactAck.message}" }
+                            // Handle transfer failure - could retry or fail the job
                         }
                     }
                     
@@ -152,6 +194,87 @@ class JobExecutorServiceImpl(
             queuedJobs = jobQueue.size,
             totalJobs = jobQueue.size + activeWorkers.values.sumOf { it.activeJobsCount }
         )
+    }
+    
+    /**
+     * Transfer artifact to worker in chunks (Fase 1: Basic implementation)
+     */
+    private suspend fun transferArtifactToWorker(
+        artifact: Artifact, 
+        channel: kotlinx.coroutines.flow.FlowCollector<ServerToWorker>
+    ) {
+        logger.info { "Starting transfer of artifact ${artifact.id} (${artifact.name})" }
+        
+        try {
+            // In a real implementation, you'd read the artifact from storage
+            // For now, we'll simulate with demo data
+            val artifactData = createDemoArtifactData(artifact)
+            
+            val chunkSize = 64 * 1024 // 64KB chunks for Fase 1
+            var sequence = 0
+            var offset = 0
+            
+            while (offset < artifactData.size) {
+                val remainingBytes = artifactData.size - offset
+                val currentChunkSize = minOf(chunkSize, remainingBytes)
+                val chunkData = artifactData.sliceArray(offset until offset + currentChunkSize)
+                val isLast = (offset + currentChunkSize) >= artifactData.size
+                
+                val artifactChunk = ArtifactChunk.newBuilder()
+                    .setArtifactId(artifact.id)
+                    .setData(com.google.protobuf.ByteString.copyFrom(chunkData))
+                    .setSequence(sequence)
+                    .setIsLast(isLast)
+                    .build()
+                
+                channel.emit(ServerToWorker.newBuilder()
+                    .setArtifactChunk(artifactChunk)
+                    .build())
+                
+                logger.debug { "Sent chunk $sequence for artifact ${artifact.id} (${chunkData.size} bytes, last: $isLast)" }
+                
+                offset += currentChunkSize
+                sequence++
+                
+                // Small delay between chunks to avoid overwhelming the worker
+                delay(10)
+            }
+            
+            logger.info { "Completed transfer of artifact ${artifact.id} in $sequence chunks" }
+            
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to transfer artifact ${artifact.id}" }
+            throw e
+        }
+    }
+    
+    /**
+     * Create demo artifact data for testing (Fase 1)
+     */
+    private fun createDemoArtifactData(artifact: Artifact): ByteArray {
+        // For demonstration, create a simple text file with artifact info
+        val content = """
+            Artifact: ${artifact.name}
+            Type: ${artifact.type}
+            ID: ${artifact.id}
+            Path: ${artifact.path}
+            
+            This is a demo artifact created for testing the transfer functionality.
+            In a real implementation, this would be read from actual storage.
+            
+            Generated at: ${java.time.Instant.now()}
+        """.trimIndent()
+        
+        return content.toByteArray(Charsets.UTF_8)
+    }
+    
+    /**
+     * Calculate SHA-256 checksum
+     */
+    private fun calculateSha256(data: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(data)
+        return hashBytes.joinToString("") { "%02x".format(it) }
     }
 }
 
