@@ -2,6 +2,7 @@ package dev.rubentxu.hodei.pipelines.infrastructure.script
 
 import kotlin.script.experimental.annotations.KotlinScript
 
+
 /**
  * Kotlin Script template for Pipeline DSL
  * Similar to Gradle Kotlin DSL
@@ -21,11 +22,30 @@ class PipelineContext(
 ) {
     val tasks = TaskContainer(this)
     val env = mutableMapOf<String, String>().apply { putAll(environment) }
-    
+
     fun println(message: Any?) {
         val text = message.toString()
         outputCapture.appendLine(text)
         kotlin.io.println(text) // Also print to actual stdout for debugging
+    }
+
+    fun sh(command: String): String {
+        try {
+            val process = ProcessBuilder("/bin/sh", "-c", command)
+                .redirectErrorStream(true)
+                .start()
+
+            val output = process.inputStream.bufferedReader().readText()
+            val exitCode = process.waitFor()
+
+            if (exitCode != 0) {
+                throw RuntimeException("Command '$command' failed with exit code $exitCode and output:\n$output")
+            }
+            println(output)
+            return output
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to execute command '$command'", e)
+        }
     }
 }
 
@@ -34,22 +54,22 @@ class PipelineContext(
  */
 class TaskContainer(private val context: PipelineContext) {
     private val tasks = mutableMapOf<String, PipelineTask>()
-    
+
     fun register(name: String, configuration: PipelineTask.() -> Unit = {}): PipelineTask {
         val task = PipelineTask(name, this)
         task.configuration()
         tasks[name] = task
         return task
     }
-    
+
     fun getByName(name: String): PipelineTask {
         return tasks[name] ?: throw IllegalArgumentException("Task '$name' not found")
     }
-    
+
     fun findByName(name: String): PipelineTask? {
         return tasks[name]
     }
-    
+
     internal fun getAllTasks(): Map<String, PipelineTask> = tasks.toMap()
     internal fun getContext(): PipelineContext = context
 }
@@ -59,53 +79,38 @@ class TaskContainer(private val context: PipelineContext) {
  */
 class PipelineTask(val name: String, private val container: TaskContainer) {
     private val dependencies = mutableSetOf<String>()
-    private val doFirstActions = mutableListOf<PipelineContext.() -> Unit>()
-    private val doLastActions = mutableListOf<PipelineContext.() -> Unit>()
-    private var executed = false
-    
+    private val doFirstActions = mutableListOf<() -> Unit>()
+    private val doLastActions = mutableListOf<() -> Unit>()
+
     fun dependsOn(vararg taskNames: String) {
         dependencies.addAll(taskNames)
     }
-    
-    fun doFirst(action: PipelineContext.() -> Unit) {
+
+    fun doFirst(action: () -> Unit) {
         doFirstActions.add(action)
     }
-    
-    fun doLast(action: PipelineContext.() -> Unit) {
+
+    fun doLast(action: () -> Unit) {
         doLastActions.add(action)
     }
-    
-    fun execute() {
-        execute(container.getContext())
-    }
-    
-    internal fun execute(context: PipelineContext) {
-        if (executed) return
-        
-        // Execute dependencies first
-        dependencies.forEach { depName ->
-            val depTask = context.tasks.getByName(depName)
-            depTask.execute(context)
-        }
-        
-        // Execute this task
-        try {
-            doFirstActions.forEach { action -> context.action() }
-            doLastActions.forEach { action -> context.action() }
-            executed = true
-        } catch (e: Exception) {
-            throw RuntimeException("Task '$name' failed: ${e.message}", e)
-        }
-    }
-    
-    internal fun getDependencies(): Set<String> = dependencies.toSet()
-    internal fun isExecuted(): Boolean = executed
-    internal fun reset() { executed = false }
-}
 
-/**
- * Script compilation configuration
- */
-object PipelineScriptCompilationConfiguration : kotlin.script.experimental.api.ScriptCompilationConfiguration({
-    // For now, keep it simple to get the MVP working
-})
+    fun execute() {
+        val executedTasks = mutableSetOf<String>()
+        executeWithDependencies(executedTasks)
+    }
+
+    private fun executeWithDependencies(executedTasks: MutableSet<String>) {
+        if (executedTasks.contains(name)) {
+            return
+        }
+
+        dependencies.forEach { depName ->
+            container.findByName(depName)?.executeWithDependencies(executedTasks)
+        }
+
+        container.getContext().println("Executing task: $name")
+        doFirstActions.forEach { it() }
+        doLastActions.forEach { it() }
+        executedTasks.add(name)
+    }
+}

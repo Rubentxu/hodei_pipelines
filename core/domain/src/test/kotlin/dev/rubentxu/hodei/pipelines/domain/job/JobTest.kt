@@ -1,5 +1,7 @@
 package dev.rubentxu.hodei.pipelines.domain.job
 
+import dev.rubentxu.hodei.pipelines.domain.job.JobPayload
+
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import java.time.Instant
@@ -11,7 +13,7 @@ class JobTest {
         val id = JobId("job-123")
         val definition = JobDefinition(
             name = "Test Job",
-            command = listOf("echo", "hello world"),
+            payload = JobPayload.Command(listOf("echo", "hello world")),
             workingDirectory = "/tmp"
         )
         
@@ -94,7 +96,7 @@ class JobTest {
             id = JobId("test-job"),
             definition = JobDefinition(
                 name = "Test Job",
-                command = listOf("echo", "test"),
+                payload = JobPayload.Command(listOf("echo", "test")),
                 workingDirectory = "/tmp"
             )
         )

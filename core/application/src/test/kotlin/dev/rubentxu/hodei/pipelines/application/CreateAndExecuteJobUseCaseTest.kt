@@ -1,6 +1,9 @@
 package dev.rubentxu.hodei.pipelines.application
 
-import dev.rubentxu.hodei.pipelines.domain.job.*
+import dev.rubentxu.hodei.pipelines.domain.job.Job
+import dev.rubentxu.hodei.pipelines.domain.job.JobDefinition
+import dev.rubentxu.hodei.pipelines.domain.job.JobId
+import dev.rubentxu.hodei.pipelines.domain.job.JobPayload
 import dev.rubentxu.hodei.pipelines.domain.worker.*
 import dev.rubentxu.hodei.pipelines.port.*
 import io.mockk.*
@@ -29,7 +32,7 @@ class CreateAndExecuteJobUseCaseTest {
         // Given
         val jobDefinition = JobDefinition(
             name = "Test Job",
-            command = listOf("echo", "hello world"),
+            payload = JobPayload.Command(listOf("echo", "hello world")),
             workingDirectory = "/tmp"
         )
         
@@ -78,7 +81,7 @@ class CreateAndExecuteJobUseCaseTest {
         // Given
         val jobDefinition = JobDefinition(
             name = "Test Job", 
-            command = listOf("echo", "hello"),
+            payload = JobPayload.Command(listOf("echo", "hello")),
             workingDirectory = "/tmp"
         )
         

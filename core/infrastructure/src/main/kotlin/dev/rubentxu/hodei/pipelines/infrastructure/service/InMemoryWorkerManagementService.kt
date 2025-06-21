@@ -90,7 +90,7 @@ class InMemoryWorkerManagementService(
         }
     }
     
-    override suspend fun sendHeartbeat(workerId: WorkerId, status: HeartbeatData): Boolean {
+    suspend fun sendHeartbeat(workerId: WorkerId, status: HeartbeatData): Boolean {
         logger.debug { "Received heartbeat from worker ${workerId.value} with status: $status" }
         return try {
             heartbeats[workerId.value] = status

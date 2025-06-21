@@ -15,6 +15,10 @@ interface JobExecutor {
     suspend fun getJobOutput(jobId: JobId): Flow<JobOutputChunk>
 }
 
+interface ScriptExecutor {
+    fun execute(job: Job, workerId: WorkerId): Flow<JobExecutionEvent>
+}
+
 /**
  * Job Execution Events
  */

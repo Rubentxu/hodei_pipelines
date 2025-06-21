@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.Flow
 interface WorkerManagementService {
     suspend fun registerWorker(request: WorkerRegistrationRequest): WorkerRegistrationResult
     suspend fun unregisterWorker(workerId: WorkerId): Boolean
-    suspend fun sendHeartbeat(workerId: WorkerId, status: HeartbeatData): Boolean
     suspend fun getWorkerInfo(workerId: WorkerId): Worker?
     fun subscribeToWorkerEvents(): Flow<WorkerEvent>
 }

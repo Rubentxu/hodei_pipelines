@@ -1,5 +1,6 @@
 package dev.rubentxu.hodei.pipelines.worker.application
 
+import dev.rubentxu.hodei.pipelines.infrastructure.script.PipelineScriptExecutor
 import dev.rubentxu.hodei.pipelines.infrastructure.worker.PipelineWorker
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
@@ -49,12 +50,13 @@ object PipelineWorkerApp {
             logger.info { "  Capabilities: ${config.capabilities}" }
             
             // Create and start worker
+            val scriptExecutor = PipelineScriptExecutor()
             val worker = PipelineWorker(
                 workerId = config.workerId,
                 workerName = config.workerName,
                 serverHost = config.serverHost,
                 serverPort = config.serverPort,
-                capabilities = config.capabilities
+                scriptExecutor = scriptExecutor
             )
             
             // Start worker in blocking mode

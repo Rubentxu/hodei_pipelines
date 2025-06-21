@@ -57,38 +57,6 @@ class WorkerManagementServiceImpl(
         }
     }
     
-    /**
-     * Handle periodic heartbeat from worker
-     */
-    override suspend fun sendHeartbeat(request: WorkerHeartbeat): Empty {
-        logger.debug { "Received heartbeat from worker: ${request.workerId.value}" }
-        
-        try {
-            // Convert heartbeat to domain update
-            val heartbeatUpdate = WorkerMappers.createHeartbeatUpdate(request)
-            
-            // Find and update worker
-            val workerResult = workerRepository.findById(heartbeatUpdate.workerId)
-            if (workerResult.isSuccess) {
-                val worker = workerResult.getOrThrow()
-                
-                // Update worker with new heartbeat timestamp
-                val updatedWorker = worker.updateHeartbeat()
-                
-                // Save updated worker
-                workerRepository.save(updatedWorker)
-                
-                logger.debug { "Updated heartbeat for worker: ${worker.id.value}" }
-            } else {
-                logger.warn { "Worker not found for heartbeat: ${heartbeatUpdate.workerId.value}" }
-            }
-            
-        } catch (e: Exception) {
-            logger.error(e) { "Error processing heartbeat from worker: ${request.workerId.value}" }
-        }
-        
-        return Empty.getDefaultInstance()
-    }
     
     /**
      * Get information about a specific worker

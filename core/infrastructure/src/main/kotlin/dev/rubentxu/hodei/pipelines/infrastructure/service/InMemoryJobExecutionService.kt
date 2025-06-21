@@ -1,6 +1,7 @@
 package dev.rubentxu.hodei.pipelines.infrastructure.service
 
 import dev.rubentxu.hodei.pipelines.domain.job.Job
+import dev.rubentxu.hodei.pipelines.domain.job.JobPayload
 import dev.rubentxu.hodei.pipelines.domain.job.JobId
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
 import dev.rubentxu.hodei.pipelines.port.JobExecutor
@@ -35,7 +36,11 @@ class InMemoryJobExecutor : JobExecutor {
         val success = (1..10).random() > 1
         
         if (success) {
-            val output = "Job '${job.definition.name}' executed successfully.\nCommand: ${job.definition.command.joinToString(" ")}\nSimulated output: Hello from worker ${workerId.value}"
+            val payloadDescription = when (val payload = job.definition.payload) {
+                is JobPayload.Command -> "Command: ${payload.commandLine.joinToString(" ")}"
+                is JobPayload.Script -> "Script"
+            }
+            val output = "Job '${job.definition.name}' executed successfully.\n$payloadDescription\nSimulated output: Hello from worker ${workerId.value}"
             logger.info { "Job ${job.id.value} completed successfully" }
             emit(JobExecutionEvent.Completed(job.id, 0, output))
             logger.debug { "Job ${job.id.value}: Emitted JobExecutionEvent.Completed" }

@@ -23,6 +23,13 @@ enum ParameterType {
   PARAMETER_TYPE_JSON = 8;
 }
 
+// Tipos de compresión disponibles
+enum CompressionType {
+  COMPRESSION_NONE = 0;
+  COMPRESSION_GZIP = 1;
+  COMPRESSION_ZSTD = 2;
+}
+
 message JobParameter {
   string name = 1;
   string description = 2;
@@ -89,10 +96,22 @@ message WorkerIdentifier {
 message JobDefinition {
   JobIdentifier id = 1;
   string name = 2;
-  repeated string command = 3; // Comando y argumentos
   map<string, string> environment = 4;
   string working_directory = 5;
   repeated JobParameter parameters = 6; // Añadidos los parámetros estructurados
+
+  oneof payload {
+    CommandPayload command = 10;
+    ScriptPayload script = 11;
+  }
+}
+
+message CommandPayload {
+  repeated string command_line = 1;
+}
+
+message ScriptPayload {
+  string content = 1;
 }
 
 // Mensaje para iniciar la ejecución de un Job
@@ -108,6 +127,18 @@ message JobExecutionMetadata {
   bool capture_stderr = 4;
   int32 max_output_size = 5; // Tamaño máximo de salida a capturar (en KB)
   map<string, string> labels = 6;
+  repeated string allowed_roles = 7; // Roles autorizados para este job ["admin", "ci-engineer"]
+  string run_as_user = 8; // Usuario para ejecución del job
+  SecurityPolicy security_policy = 9; // Política de seguridad
+}
+
+// Política de seguridad para jobs
+message SecurityPolicy {
+  bool allow_network_access = 1; // Permitir acceso a red
+  bool allow_file_system_write = 2; // Permitir escritura en filesystem
+  repeated string allowed_domains = 3; // Dominios permitidos para acceso de red
+  repeated string blocked_commands = 4; // Comandos bloqueados
+  map<string, string> environment_restrictions = 5; // Restricciones de variables de entorno
 }
 
 // Mensaje para la salida (stdout/stderr) de un Job
@@ -116,6 +147,8 @@ message JobOutputChunk {
   bytes data = 2; // Chunk de datos (stdout/stderr)
   bool is_stderr = 3; // True si es stderr, false si es stdout
   google.protobuf.Timestamp timestamp = 4;
+  bool compressed = 5; // Indicador de compresión
+  CompressionType compression_type = 6;
 }
 
 // Mensaje para el estado de ejecución de un Job en el Worker
@@ -124,15 +157,25 @@ message JobExecutionStatus {
   JobStatus status = 2;
   int32 exit_code = 3; // Código de salida del proceso
   string message = 4; // Mensaje adicional (ej. error)
-  // Añadir métricas de monitoreo aquí si es necesario
+  ResourceUsage resources = 5; // Métricas de recursos
+  map<string, string> custom_metrics = 6; // Métricas personalizadas
+}
+
+// Métricas de uso de recursos
+message ResourceUsage {
+  double cpu_usage = 1; // % CPU utilizado
+  uint64 memory_usage = 2; // Memoria utilizada en bytes
+  uint64 network_in = 3; // Bytes recibidos por red
+  uint64 network_out = 4; // Bytes enviados por red
+  uint64 disk_read = 5; // Bytes leídos de disco
+  uint64 disk_write = 6; // Bytes escritos a disco
 }
 
 // Servicio para la comunicación de ejecución de Jobs entre Server y Worker
 service JobExecutorService {
-  // Bi-directional stream para ejecutar un job, enviar entrada, y recibir salida y estado
-  rpc ExecuteJob (stream JobInputChunk) returns (stream JobOutputAndStatus);
-  // Unary call para solicitar la cancelación de un Job
-  rpc SendSignal (ControlSignal) returns (JobExecutionStatus);
+  // Establece un canal bidireccional para la ejecución de jobs.
+  // El worker envía su estado y output, y el servidor le envía jobs para ejecutar.
+  rpc JobExecutionChannel(stream WorkerToServer) returns (stream ServerToWorker);
 }
 
 // Mensaje para el input del Job (server a worker)
@@ -162,13 +205,28 @@ message JobOutputAndStatus {
   }
 }
 
+// Mensaje del Servidor hacia el Worker
+message ServerToWorker {
+  oneof message {
+    ExecuteJobRequest job_request = 1; // Un nuevo job para ejecutar
+    ControlSignal control_signal = 2;  // Para enviar señales como "cancelar" o "shutdown"
+  }
+}
+
+// Mensaje del Worker hacia el Servidor
+message WorkerToServer {
+  oneof message {
+    // El worker envía el stream de output y estado del job que está ejecutando
+    JobOutputAndStatus job_output_and_status = 1;
+    // Podríamos incluir aquí también el heartbeat para mantener el canal vivo
+    WorkerHeartbeat heartbeat = 2;
+  }
+}
+
 // Servicio para gestión del ciclo de vida de workers
 service WorkerManagementService {
   // Registrar un worker en el servidor
   rpc RegisterWorker (WorkerRegistrationRequest) returns (WorkerRegistrationResponse);
-
-  // Enviar heartbeat periódico desde el worker
-  rpc SendHeartbeat (WorkerHeartbeat) returns (google.protobuf.Empty);
 
   // Obtener información de un worker específico
   rpc GetWorkerInfo (WorkerIdentifier) returns (WorkerInfo);
@@ -180,6 +238,22 @@ service WorkerManagementService {
   rpc UnregisterWorker (WorkerIdentifier) returns (google.protobuf.Empty);
 }
 
+// Servicio para estadísticas del sistema
+service SystemStatsService {
+  // Obtener estadísticas del sistema
+  rpc GetSystemStats (google.protobuf.Empty) returns (SystemStatsResponse);
+}
+
+// Respuesta de estadísticas del sistema
+message SystemStatsResponse {
+  int32 total_workers = 1;
+  int32 active_workers = 2;
+  int32 total_jobs = 3;
+  int32 queued_jobs = 4;
+  int32 running_jobs = 5;
+  ResourceUsage system_resources = 6;
+}
+
 // Mensajes para gestión de workers
 message WorkerRegistrationRequest {
   WorkerIdentifier worker_id = 1;
@@ -188,6 +262,7 @@ message WorkerRegistrationRequest {
   map<string, string> capabilities = 4;
   string worker_version = 5;
   int32 max_concurrent_jobs = 6;
+  repeated string tags = 7; // Etiquetas para filtrado
 }
 
 message WorkerRegistrationResponse {
@@ -202,6 +277,8 @@ message WorkerHeartbeat {
   WorkerStatus status = 2;
   int32 active_jobs_count = 3;
   google.protobuf.Timestamp timestamp = 4;
+  ResourceUsage system_resources = 5; // Recursos del sistema
+  map<string, string> system_info = 6; // Información adicional del sistema
 }
 
 message WorkerInfo {
@@ -213,4 +290,6 @@ message WorkerInfo {
   google.protobuf.Timestamp last_heartbeat = 6;
   int32 active_jobs_count = 7;
   int32 max_concurrent_jobs = 8;
+  repeated string tags = 9;
+  ResourceUsage last_resources = 10; // Último reporte de recursos
 }

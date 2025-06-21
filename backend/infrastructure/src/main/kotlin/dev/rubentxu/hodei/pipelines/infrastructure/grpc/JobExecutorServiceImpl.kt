@@ -18,114 +18,159 @@ class JobExecutorServiceImpl(
     private val createAndExecuteJobUseCase: CreateAndExecuteJobUseCase,
     private val jobExecutor: JobExecutor
 ) : JobExecutorServiceGrpcKt.JobExecutorServiceCoroutineImplBase() {
-    
+
     private val logger = KotlinLogging.logger {}
-    
+    private val activeWorkers = mutableMapOf<String, WorkerSession>()
+    private val jobQueue = mutableListOf<ExecuteJobRequest>()
+
     /**
-     * Execute a job with bidirectional streaming
-     * Receives job input and parameters, returns output and status updates
+     * Establishes a bidirectional channel for job execution.
+     * The server receives messages from workers (like heartbeats or job status)
+     * and sends messages to workers (like job requests or control signals).
      */
-    override fun executeJob(requests: Flow<JobInputChunk>): Flow<JobOutputAndStatus> = flow {
-        logger.info { "Starting job execution stream" }
+    override fun jobExecutionChannel(requests: Flow<WorkerToServer>): Flow<ServerToWorker> = flow {
+        logger.info { "Job execution channel opened for worker" }
+        
+        var workerId: String? = null
         
         try {
-            var initRequest: ExecuteJobRequest? = null
-            
-            // Collect the first request which should contain the job definition
-            requests.collect { chunk ->
-                when {
-                    chunk.hasInitRequest() -> {
-                        initRequest = chunk.initRequest
-                        logger.info { "Received job execution request: ${chunk.initRequest.jobDefinition.name}" }
+            requests.collect { workerMessage ->
+                when (workerMessage.messageCase) {
+                    WorkerToServer.MessageCase.HEARTBEAT -> {
+                        val heartbeat = workerMessage.heartbeat
+                        workerId = heartbeat.workerId.value
                         
-                        // Convert gRPC request to domain request
-                        val domainRequest = JobMappers.toDomain(chunk.initRequest)
+                        logger.debug { "Received heartbeat from worker: $workerId" }
                         
-                        // Execute the job and stream results
-                        createAndExecuteJobUseCase.execute(domainRequest).collect { result ->
-                            val grpcOutput = JobMappers.toGrpcOutput(result)
-                            emit(grpcOutput)
+                        // Update worker session
+                        activeWorkers[workerId!!] = WorkerSession(
+                            workerId = workerId!!,
+                            status = heartbeat.status,
+                            activeJobsCount = heartbeat.activeJobsCount,
+                            lastHeartbeat = java.time.Instant.now(),
+                            channel = this@flow
+                        )
+                        
+                        // Check if worker can take more jobs
+                        if (heartbeat.status == WorkerStatus.WORKER_STATUS_READY && 
+                            heartbeat.activeJobsCount == 0 && 
+                            jobQueue.isNotEmpty()) {
+                            
+                            val nextJob = jobQueue.removeFirst()
+                            logger.info { "Assigning job ${nextJob.jobDefinition.name} to worker $workerId" }
+                            
+                            emit(ServerToWorker.newBuilder()
+                                .setJobRequest(nextJob)
+                                .build())
                         }
                     }
                     
-                    chunk.hasParameter() -> {
-                        // Handle job parameters (for advanced use cases)
-                        logger.debug { "Received job parameter: ${chunk.parameter.name}" }
-                        // For MVP, we don't need to handle runtime parameters
+                    WorkerToServer.MessageCase.JOB_OUTPUT_AND_STATUS -> {
+                        val jobOutput = workerMessage.jobOutputAndStatus
+                        
+                        when (jobOutput.contentCase) {
+                            JobOutputAndStatus.ContentCase.OUTPUT_CHUNK -> {
+                                val chunk = jobOutput.outputChunk
+                                logger.debug { "Received output chunk from job: ${chunk.jobId.value}" }
+                                // Here you would typically store or forward the output
+                            }
+                            
+                            JobOutputAndStatus.ContentCase.STATUS_UPDATE -> {
+                                val statusUpdate = jobOutput.statusUpdate
+                                logger.info { "Job ${statusUpdate.jobId.value} status: ${statusUpdate.status}" }
+                                
+                                // Update job status and handle completion
+                                if (statusUpdate.status == JobStatus.JOB_STATUS_SUCCESS ||
+                                    statusUpdate.status == JobStatus.JOB_STATUS_FAILED ||
+                                    statusUpdate.status == JobStatus.JOB_STATUS_CANCELLED) {
+                                    
+                                    logger.info { "Job ${statusUpdate.jobId.value} completed with status: ${statusUpdate.status}" }
+                                    
+                                    // Worker is now available for more jobs
+                                    if (jobQueue.isNotEmpty() && workerId != null) {
+                                        val nextJob = jobQueue.removeFirst()
+                                        logger.info { "Assigning next job ${nextJob.jobDefinition.name} to worker $workerId" }
+                                        
+                                        emit(ServerToWorker.newBuilder()
+                                            .setJobRequest(nextJob)
+                                            .build())
+                                    }
+                                }
+                            }
+                            
+                            else -> {
+                                logger.warn { "Received unknown job output content type: ${jobOutput.contentCase}" }
+                            }
+                        }
+                    }
+                    
+                    else -> {
+                        logger.warn { "Received unknown message type from worker: ${workerMessage.messageCase}" }
                     }
                 }
             }
-            
-            if (initRequest == null) {
-                logger.error { "No initial request received in job execution stream" }
-                emit(JobOutputAndStatus.newBuilder()
-                    .setStatusUpdate(JobExecutionStatus.newBuilder()
-                        .setJobId(JobIdentifier.newBuilder().setValue("unknown").build())
-                        .setStatus(JobStatus.JOB_STATUS_FAILED)
-                        .setMessage("No job definition received")
-                        .setExitCode(1)
-                        .build())
-                    .build())
-            }
-            
         } catch (e: Exception) {
-            logger.error(e) { "Error in job execution stream" }
-            emit(JobOutputAndStatus.newBuilder()
-                .setStatusUpdate(JobExecutionStatus.newBuilder()
-                    .setJobId(JobIdentifier.newBuilder().setValue("unknown").build())
-                    .setStatus(JobStatus.JOB_STATUS_FAILED)
-                    .setMessage("Job execution failed: ${e.message}")
-                    .setExitCode(1)
-                    .build())
-                .build())
+            logger.error(e) { "Error in job execution channel for worker: $workerId" }
         } finally {
-            logger.info { "Job execution stream completed" }
+            // Clean up worker session when channel closes
+            workerId?.let { id ->
+                activeWorkers.remove(id)
+                logger.info { "Worker $id disconnected, removed from active workers" }
+            }
         }
     }
     
     /**
-     * Send control signal to a running job (cancel, pause, resume)
+     * Queue a job for execution
      */
-    override suspend fun sendSignal(request: ControlSignal): JobExecutionStatus {
-        logger.info { "Received control signal: ${request.type} - ${request.message}" }
+    fun queueJob(jobRequest: ExecuteJobRequest) {
+        logger.info { "Queuing job: ${jobRequest.jobDefinition.name}" }
         
-        return try {
-            // Extract job ID from the signal message (simplified for MVP)
-            // In a real implementation, you'd need a proper job identifier in the signal
-            val jobIdValue = extractJobIdFromMessage(request.message)
-            val jobId = JobId(jobIdValue)
+        // Try to assign to an available worker immediately
+        val availableWorker = activeWorkers.values.find { worker ->
+            worker.status == WorkerStatus.WORKER_STATUS_READY && worker.activeJobsCount == 0
+        }
+        
+        if (availableWorker != null) {
+            logger.info { "Assigning job ${jobRequest.jobDefinition.name} immediately to worker ${availableWorker.workerId}" }
             
-            // Convert signal to domain signal
-            val domainSignal = JobMappers.toDomainSignal(request)
-            
-            // Send signal to job executor
-            val success = jobExecutor.sendSignal(jobId, domainSignal)
-            
-            JobExecutionStatus.newBuilder()
-                .setJobId(JobIdentifier.newBuilder().setValue(jobIdValue).build())
-                .setStatus(if (success) JobStatus.JOB_STATUS_CANCELLED else JobStatus.JOB_STATUS_FAILED)
-                .setMessage(if (success) "Signal sent successfully" else "Failed to send signal")
-                .build()
-                
-        } catch (e: Exception) {
-            logger.error(e) { "Error sending control signal" }
-            
-            JobExecutionStatus.newBuilder()
-                .setJobId(JobIdentifier.newBuilder().setValue("unknown").build())
-                .setStatus(JobStatus.JOB_STATUS_FAILED)
-                .setMessage("Failed to send signal: ${e.message}")
-                .setExitCode(1)
-                .build()
+            // This would require a way to send messages to specific workers
+            // For now, we'll add to queue and let the next heartbeat handle it
+            jobQueue.add(jobRequest)
+        } else {
+            logger.info { "No available workers, adding job to queue: ${jobRequest.jobDefinition.name}" }
+            jobQueue.add(jobRequest)
         }
     }
     
     /**
-     * Extract job ID from signal message
-     * This is a simplified implementation for MVP
+     * Get current system statistics
      */
-    private fun extractJobIdFromMessage(message: String): String {
-        // Look for patterns like "job:12345" or just return a default
-        val jobIdRegex = Regex("job:([a-zA-Z0-9-]+)")
-        return jobIdRegex.find(message)?.groupValues?.get(1) ?: "unknown"
+    fun getSystemStats(): SystemStats {
+        return SystemStats(
+            activeWorkers = activeWorkers.size,
+            queuedJobs = jobQueue.size,
+            totalJobs = jobQueue.size + activeWorkers.values.sumOf { it.activeJobsCount }
+        )
     }
 }
+
+/**
+ * Represents an active worker session
+ */
+data class WorkerSession(
+    val workerId: String,
+    val status: WorkerStatus,
+    val activeJobsCount: Int,
+    val lastHeartbeat: java.time.Instant,
+    val channel: kotlinx.coroutines.flow.FlowCollector<ServerToWorker>
+)
+
+/**
+ * System statistics
+ */
+data class SystemStats(
+    val activeWorkers: Int,
+    val queuedJobs: Int,
+    val totalJobs: Int
+)

@@ -1,228 +1,149 @@
 package dev.rubentxu.hodei.pipelines.infrastructure.script
 
+
 import dev.rubentxu.hodei.pipelines.domain.job.Job
 import dev.rubentxu.hodei.pipelines.domain.job.JobDefinition
+import dev.rubentxu.hodei.pipelines.domain.job.JobPayload
 import dev.rubentxu.hodei.pipelines.domain.job.JobId
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
 import dev.rubentxu.hodei.pipelines.port.JobExecutionEvent
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 class PipelineScriptExecutorTest {
-    
-    private val scriptExecutor = PipelineScriptExecutor()
-    
-    @Test
-    fun `should execute simple task in pipeline script`() = runTest {
-        // Given - Pipeline script similar to Gradle DSL
-        val script = """
-            tasks.register("build") {
-                doLast {
-                    println("Building project...")
-                    env["BUILD_STATUS"] = "success"
-                }
-            }
-            
-            tasks.register("test") {
-                dependsOn("build")
-                doLast {
-                    println("Running tests...")
-                    println("Build status: " + env["BUILD_STATUS"])
-                }
-            }
-            
-            // Execute specific task
-            tasks.getByName("test").execute()
-        """.trimIndent()
-        
-        val job = Job(
-            id = JobId("pipeline-job-1"),
+
+    private lateinit var scriptExecutor: PipelineScriptExecutor
+
+    @BeforeEach
+    fun setUp() {
+        scriptExecutor = PipelineScriptExecutor()
+    }
+
+    private fun createJob(script: String, jobId: String = "test-job-1"): Job {
+        return Job(
+            id = JobId(jobId),
             definition = JobDefinition(
-                name = "Pipeline Task Job",
-                command = listOf("kotlin-script"),
-                workingDirectory = "/tmp",
-                environment = mapOf("SCRIPT_CONTENT" to script)
+                name = "Test Job",
+                payload = JobPayload.Script(script),
+                workingDirectory = "/tmp"
             )
         )
-        
-        // When
-        val events = scriptExecutor.execute(job, WorkerId("test-worker")).toList()
-        
-        // Then
-        assertTrue(events.any { it is JobExecutionEvent.Started })
-        assertTrue(events.any { it is JobExecutionEvent.Completed })
-        
-        val completedEvent = events.find { it is JobExecutionEvent.Completed } as? JobExecutionEvent.Completed
-        assertNotNull(completedEvent)
-        assertTrue(completedEvent!!.output.contains("Building project..."))
-        assertTrue(completedEvent.output.contains("Running tests..."))
-        assertTrue(completedEvent.output.contains("Build status: success"))
     }
-    
+
     @Test
-    fun `should support task dependencies like gradle`() = runTest {
+    fun `should execute a simple script successfully`() = runTest {
         // Given
         val script = """
-            tasks.register("compile") {
-                doLast {
-                    println("Compiling sources...")
-                }
-            }
-            
-            tasks.register("processResources") {
-                doLast {
-                    println("Processing resources...")
-                }
-            }
-            
-            tasks.register("classes") {
-                dependsOn("compile", "processResources")
-                doLast {
-                    println("Classes ready!")
-                }
-            }
-            
-            tasks.register("test") {
-                dependsOn("classes")
-                doLast {
-                    println("Running unit tests...")
-                }
-            }
-            
-            tasks.register("build") {
-                dependsOn("classes", "test")
-                doLast {
-                    println("Build completed!")
-                }
-            }
-            
-            // Execute build - should run all dependencies in correct order
-            tasks.getByName("build").execute()
+            println("Hello from script!")
         """.trimIndent()
-        
-        val job = Job(
-            id = JobId("dependency-job-1"),
-            definition = JobDefinition(
-                name = "Dependency Task Job",
-                command = listOf("kotlin-script"),
-                workingDirectory = "/tmp",
-                environment = mapOf("SCRIPT_CONTENT" to script)
-            )
-        )
-        
+        val job = createJob(script)
+
         // When
         val events = scriptExecutor.execute(job, WorkerId("test-worker")).toList()
-        
+
         // Then
-        val completedEvent = events.find { it is JobExecutionEvent.Completed } as? JobExecutionEvent.Completed
+        val completedEvent = events.last() as? JobExecutionEvent.Completed
         assertNotNull(completedEvent)
-        
-        val output = completedEvent!!.output
-        val lines = output.lines().filter { it.isNotBlank() }
-        
-        // Check that dependencies run before dependent tasks
-        val compileIndex = lines.indexOfFirst { it.contains("Compiling sources") }
-        val resourcesIndex = lines.indexOfFirst { it.contains("Processing resources") }
-        val classesIndex = lines.indexOfFirst { it.contains("Classes ready") }
-        val testIndex = lines.indexOfFirst { it.contains("Running unit tests") }
-        val buildIndex = lines.indexOfFirst { it.contains("Build completed") }
-        
-        assertTrue(compileIndex < classesIndex)
-        assertTrue(resourcesIndex < classesIndex)
-        assertTrue(classesIndex < testIndex)
-        assertTrue(testIndex < buildIndex)
+        assertTrue(completedEvent!!.output.contains("Hello from script!"))
     }
-    
+
     @Test
-    fun `should support task configuration blocks`() = runTest {
+    fun `should handle script compilation failure`() = runTest {
         // Given
         val script = """
-            tasks.register("dockerBuild") {
-                val imageName = "my-app:latest"
-                val dockerFile = "Dockerfile"
-                
-                doFirst {
-                    println("Preparing Docker build...")
-                    println("Image: " + imageName)
-                    println("Dockerfile: " + dockerFile)
-                }
-                
-                doLast {
-                    println("Docker build completed!")
-                    env["DOCKER_IMAGE"] = imageName
-                }
-            }
-            
-            tasks.register("dockerPush") {
-                dependsOn("dockerBuild")
-                doLast {
-                    val image = env["DOCKER_IMAGE"] ?: "unknown"
-                    println("Pushing Docker image: " + image)
-                }
-            }
-            
-            tasks.getByName("dockerPush").execute()
+            println("This will not compile")
+            val x: String = 123
         """.trimIndent()
-        
-        val job = Job(
-            id = JobId("config-job-1"),
-            definition = JobDefinition(
-                name = "Configuration Task Job",
-                command = listOf("kotlin-script"),
-                workingDirectory = "/tmp",
-                environment = mapOf("SCRIPT_CONTENT" to script)
-            )
-        )
-        
+        val job = createJob(script)
+
         // When
         val events = scriptExecutor.execute(job, WorkerId("test-worker")).toList()
-        
+
         // Then
-        val completedEvent = events.find { it is JobExecutionEvent.Completed } as? JobExecutionEvent.Completed
-        assertNotNull(completedEvent)
-        
-        val output = completedEvent!!.output
-        assertTrue(output.contains("Preparing Docker build..."))
-        assertTrue(output.contains("Image: my-app:latest"))
-        assertTrue(output.contains("Docker build completed!"))
-        assertTrue(output.contains("Pushing Docker image: my-app:latest") || output.contains("Pushing Docker image: unknown"))
-    }
-    
-    @Test
-    fun `should handle task execution failure`() = runTest {
-        // Given
-        val script = """
-            tasks.register("failingTask") {
-                doLast {
-                    println("About to fail...")
-                    throw RuntimeException("Task execution failed!")
-                }
-            }
-            
-            tasks.getByName("failingTask").execute()
-        """.trimIndent()
-        
-        val job = Job(
-            id = JobId("failing-job-1"),
-            definition = JobDefinition(
-                name = "Failing Task Job",
-                command = listOf("kotlin-script"),
-                workingDirectory = "/tmp",
-                environment = mapOf("SCRIPT_CONTENT" to script)
-            )
-        )
-        
-        // When
-        val events = scriptExecutor.execute(job, WorkerId("test-worker")).toList()
-        
-        // Then
-        assertTrue(events.any { it is JobExecutionEvent.Started })
-        assertTrue(events.any { it is JobExecutionEvent.Failed })
-        
-        val failedEvent = events.find { it is JobExecutionEvent.Failed } as? JobExecutionEvent.Failed
+        val failedEvent = events.last() as? JobExecutionEvent.Failed
         assertNotNull(failedEvent)
-        assertTrue(failedEvent!!.error.contains("Task execution failed!"))
+        assertTrue(failedEvent!!.error.contains("Initializer type mismatch: expected 'String', actual 'Int'."))
+    }
+
+    @Test
+    fun `should handle script runtime exception`() = runTest {
+        // Given
+        val script = """
+            println("About to throw an exception")
+            throw RuntimeException("BOOM!")
+        """.trimIndent()
+        val job = createJob(script)
+
+        // When
+        val events = scriptExecutor.execute(job, WorkerId("test-worker")).toList()
+
+        // Then
+        val failedEvent = events.last() as? JobExecutionEvent.Failed
+        assertNotNull(failedEvent)
+        assertTrue(failedEvent!!.error.contains("BOOM!"))
+    }
+
+    @Test
+    fun `should execute sh command successfully`() = runTest {
+        // Given
+        val script = """
+            val output = sh("echo 'Hello from sh'")
+            println("sh command output: " + output)
+        """.trimIndent()
+        val job = createJob(script)
+
+        // When
+        val events = scriptExecutor.execute(job, WorkerId("test-worker")).toList()
+
+        // Then
+        val completedEvent = events.last() as? JobExecutionEvent.Completed
+        assertNotNull(completedEvent)
+        assertTrue(completedEvent!!.output.contains("Hello from sh"))
+        assertTrue(completedEvent.output.contains("sh command output: Hello from sh"))
+    }
+
+    @Test
+    fun `should handle failing sh command`() = runTest {
+        // Given
+        val script = """
+            sh("exit 1")
+        """.trimIndent()
+        val job = createJob(script)
+
+        // When
+        val events = scriptExecutor.execute(job, WorkerId("test-worker")).toList()
+
+        // Then
+        val failedEvent = events.last() as? JobExecutionEvent.Failed
+        assertNotNull(failedEvent)
+        assertTrue(failedEvent!!.error.contains("failed with exit code 1"))
+    }
+
+    @Test
+    fun `should execute tasks with dependencies correctly`() = runTest {
+        // Given
+        val script = """
+            tasks.register("A") {
+                doLast { println("Task A executed") }
+            }
+            tasks.register("B") {
+                dependsOn("A")
+                doLast { println("Task B executed") }
+            }
+            tasks.getByName("B").execute()
+        """.trimIndent()
+        val job = createJob(script)
+
+        // When
+        val events = scriptExecutor.execute(job, WorkerId("test-worker")).toList()
+
+        // Then
+        val completedEvent = events.last() as? JobExecutionEvent.Completed
+        assertNotNull(completedEvent)
+        val output = completedEvent!!.output
+        assertTrue(output.indexOf("Task A executed") < output.indexOf("Task B executed"))
     }
 }

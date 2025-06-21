@@ -2,6 +2,7 @@ package dev.rubentxu.hodei.pipelines.domain.orchestration
 
 import dev.rubentxu.hodei.pipelines.domain.job.Job
 import dev.rubentxu.hodei.pipelines.domain.job.JobDefinition
+import dev.rubentxu.hodei.pipelines.domain.job.JobPayload
 import dev.rubentxu.hodei.pipelines.domain.job.JobId
 import dev.rubentxu.hodei.pipelines.domain.worker.Worker
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
@@ -21,7 +22,7 @@ class JobSchedulerTest {
             id = JobId(id),
             definition = JobDefinition(
                 name = name,
-                command = listOf("echo", "test"),
+                payload = JobPayload.Command(listOf("echo", "test")),
                 workingDirectory = "/tmp",
                 environment = mutableMapOf("TEST" to "true")
             )

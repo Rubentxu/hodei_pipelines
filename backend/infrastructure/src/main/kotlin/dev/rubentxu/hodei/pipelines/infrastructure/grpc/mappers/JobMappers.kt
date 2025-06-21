@@ -24,9 +24,15 @@ object JobMappers {
      */
     fun toDomain(request: ExecuteJobRequest): CreateAndExecuteJobRequest {
         val jobDef = request.jobDefinition
+        val domainPayload = when (jobDef.payloadCase) {
+            GrpcJobDefinition.PayloadCase.COMMAND -> JobPayload.Command(jobDef.command.commandLineList)
+            GrpcJobDefinition.PayloadCase.SCRIPT -> JobPayload.Script(jobDef.script.content)
+            else -> throw IllegalArgumentException("Unsupported payload type")
+        }
+
         val jobDefinition = DomainJobDefinition(
             name = jobDef.name,
-            command = jobDef.commandList,
+            payload = domainPayload,
             workingDirectory = jobDef.workingDirectory.takeIf { it.isNotEmpty() } ?: "/tmp",
             environment = jobDef.environmentMap.toMap()
         )
@@ -37,13 +43,23 @@ object JobMappers {
      * Convert domain Job to gRPC JobDefinition
      */
     fun toGrpcJobDefinition(job: Job): GrpcJobDefinition {
-        return GrpcJobDefinition.newBuilder()
+        val builder = GrpcJobDefinition.newBuilder()
             .setId(JobIdentifier.newBuilder().setValue(job.id.value).build())
             .setName(job.definition.name)
-            .addAllCommand(job.definition.command)
             .setWorkingDirectory(job.definition.workingDirectory)
             .putAllEnvironment(job.definition.environment)
-            .build()
+
+        when (val payload = job.definition.payload) {
+            is JobPayload.Command -> {
+                val commandPayload = CommandPayload.newBuilder().addAllCommandLine(payload.commandLine).build()
+                builder.setCommand(commandPayload)
+            }
+            is JobPayload.Script -> {
+                val scriptPayload = ScriptPayload.newBuilder().setContent(payload.content).build()
+                builder.setScript(scriptPayload)
+            }
+        }
+        return builder.build()
     }
     
     /**

@@ -38,7 +38,7 @@ enum class JobStatus {
 
 data class JobDefinition(
     val name: String,
-    val command: List<String>,
+    val payload: JobPayload,
     val environment: Map<String, String> = emptyMap(),
     val workingDirectory: String,
     val parameters: List<JobParameter> = emptyList(),
