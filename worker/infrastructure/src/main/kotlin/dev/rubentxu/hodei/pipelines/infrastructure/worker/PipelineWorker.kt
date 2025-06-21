@@ -33,6 +33,8 @@ import java.io.Closeable
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPInputStream
+import java.io.ByteArrayInputStream
 import dev.rubentxu.hodei.pipelines.proto.JobDefinition as GrpcJobDefinition
 
 private val logger = KotlinLogging.logger {}
@@ -54,9 +56,10 @@ class PipelineWorker(
 
     private val workerScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     
-    // Artifact management (Fase 1)
+    // Artifact management (Fase 2: With cache)
     private val artifactCache = mutableMapOf<String, ArtifactDownload>()
     private val artifactDirectory = File(System.getProperty("java.io.tmpdir"), "hodei-artifacts-$workerId")
+    private val persistentArtifacts = mutableMapOf<String, CachedArtifact>()
     
     init {
         // Create artifact directory
@@ -64,6 +67,9 @@ class PipelineWorker(
             artifactDirectory.mkdirs()
             logger.info { "Created artifact directory: ${artifactDirectory.absolutePath}" }
         }
+        
+        // Load existing artifacts from cache
+        loadPersistedArtifacts()
     }
 
     fun start() {
@@ -138,6 +144,18 @@ class PipelineWorker(
                                         .setArtifactAck(ack)
                                         .build()
                                     toServerChannel.send(ackMessage)
+                                }
+                            }
+                            ServerToWorker.MessageCase.CACHE_QUERY -> {
+                                val cacheQuery = serverMessage.cacheQuery
+                                logger.debug { "Received cache query for job ${cacheQuery.jobId} with ${cacheQuery.artifactIdsList.size} artifacts" }
+                                
+                                launch {
+                                    val cacheResponse = handleCacheQuery(cacheQuery)
+                                    val responseMessage = WorkerToServer.newBuilder()
+                                        .setCacheResponse(cacheResponse)
+                                        .build()
+                                    toServerChannel.send(responseMessage)
                                 }
                             }
                             else -> {
@@ -261,50 +279,77 @@ class PipelineWorker(
     }
     
     /**
-     * Handle incoming artifact chunk (Fase 1: Basic implementation)
+     * Handle incoming artifact chunk (Fase 2: With compression and enhanced cache)
      */
     private suspend fun handleArtifactChunk(chunk: dev.rubentxu.hodei.pipelines.proto.ArtifactChunk): dev.rubentxu.hodei.pipelines.proto.ArtifactAck {
         return try {
             val artifactId = chunk.artifactId
+            
+            // Check if artifact is already cached
+            val cachedArtifact = persistentArtifacts[artifactId]
+            if (cachedArtifact != null) {
+                logger.info { "Artifact $artifactId already in cache, skipping transfer" }
+                return dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+                    .setArtifactId(artifactId)
+                    .setSuccess(true)
+                    .setCacheHit(true)
+                    .setMessage("Artifact found in cache")
+                    .setCalculatedChecksum(cachedArtifact.checksum)
+                    .setCacheStatus(buildCacheStatus())
+                    .build()
+            }
             
             // Get or create artifact download state
             val download = artifactCache.getOrPut(artifactId) {
                 ArtifactDownload(
                     artifactId = artifactId,
                     buffer = mutableListOf(),
-                    expectedChecksum = "" // We'll get this from metadata in future phases
+                    expectedChecksum = "",
+                    compressionType = chunk.compression,
+                    originalSize = chunk.originalSize
                 )
             }
             
             // Add chunk data to buffer
             download.buffer.add(chunk.data.toByteArray())
             
-            logger.debug { "Added chunk ${chunk.sequence} for artifact $artifactId (${chunk.data.size()} bytes)" }
+            logger.debug { "Added chunk ${chunk.sequence} for artifact $artifactId (${chunk.data.size()} bytes, compression: ${chunk.compression})" }
             
             // If this is the last chunk, finalize the artifact
             if (chunk.isLast) {
-                val success = finalizeArtifact(download)
+                val success = finalizeArtifactWithDecompression(download)
                 
                 if (success) {
-                    // Calculate final checksum
-                    val finalData = download.buffer.flatMap { it.toList() }.toByteArray()
+                    // Calculate final checksum of decompressed data
+                    val finalData = getFinalArtifactData(download)
                     val calculatedChecksum = calculateSha256(finalData)
                     
-                    logger.info { "Successfully received artifact $artifactId (${finalData.size} bytes)" }
+                    // Store in persistent cache
+                    persistentArtifacts[artifactId] = CachedArtifact(
+                        id = artifactId,
+                        checksum = calculatedChecksum,
+                        size = finalData.size.toLong(),
+                        cachedAt = java.time.Instant.now()
+                    )
                     
-                    // Remove from cache
+                    logger.info { "Successfully received and cached artifact $artifactId (${finalData.size} bytes)" }
+                    
+                    // Remove from temporary cache
                     artifactCache.remove(artifactId)
                     
                     dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
                         .setArtifactId(artifactId)
                         .setSuccess(true)
-                        .setMessage("Artifact received successfully")
+                        .setCacheHit(false)
+                        .setMessage("Artifact received and cached successfully")
                         .setCalculatedChecksum(calculatedChecksum)
+                        .setCacheStatus(buildCacheStatus())
                         .build()
                 } else {
                     dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
                         .setArtifactId(artifactId)
                         .setSuccess(false)
+                        .setCacheHit(false)
                         .setMessage("Failed to finalize artifact")
                         .build()
                 }
@@ -313,6 +358,7 @@ class PipelineWorker(
                 dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
                     .setArtifactId(artifactId)
                     .setSuccess(true)
+                    .setCacheHit(false)
                     .setMessage("Chunk ${chunk.sequence} received")
                     .build()
             }
@@ -323,6 +369,7 @@ class PipelineWorker(
             dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
                 .setArtifactId(chunk.artifactId)
                 .setSuccess(false)
+                .setCacheHit(false)
                 .setMessage("Error: ${e.message}")
                 .build()
         }
@@ -343,6 +390,144 @@ class PipelineWorker(
         } catch (e: Exception) {
             logger.error(e) { "Failed to save artifact ${download.artifactId}" }
             false
+        }
+    }
+    
+    /**
+     * Handle cache query from server (Fase 2)
+     */
+    private suspend fun handleCacheQuery(query: dev.rubentxu.hodei.pipelines.proto.ArtifactCacheQuery): dev.rubentxu.hodei.pipelines.proto.ArtifactCacheResponse {
+        logger.debug { "Processing cache query for job ${query.jobId} with ${query.artifactIdsList.size} artifacts" }
+        
+        val artifactInfos = query.artifactIdsList.map { artifactId ->
+            val cachedArtifact = persistentArtifacts[artifactId]
+            
+            dev.rubentxu.hodei.pipelines.proto.ArtifactCacheInfo.newBuilder()
+                .setArtifactId(artifactId)
+                .setCached(cachedArtifact != null)
+                .setCachedChecksum(cachedArtifact?.checksum ?: "")
+                .setNeedsTransfer(cachedArtifact == null)
+                .build()
+        }
+        
+        return dev.rubentxu.hodei.pipelines.proto.ArtifactCacheResponse.newBuilder()
+            .setJobId(query.jobId)
+            .addAllArtifacts(artifactInfos)
+            .build()
+    }
+    
+    /**
+     * Load persisted artifacts from disk (Fase 2)
+     */
+    private fun loadPersistedArtifacts() {
+        try {
+            val metadataFile = File(artifactDirectory, "artifact_metadata.txt")
+            if (metadataFile.exists()) {
+                metadataFile.readLines().forEach { line ->
+                    val parts = line.split("|")
+                    if (parts.size >= 4) {
+                        val id = parts[0]
+                        val checksum = parts[1]
+                        val size = parts[2].toLongOrNull() ?: 0L
+                        val cachedAt = try { java.time.Instant.parse(parts[3]) } catch (e: Exception) { java.time.Instant.now() }
+                        
+                        // Verify artifact file still exists
+                        val artifactFile = File(artifactDirectory, "$id.artifact")
+                        if (artifactFile.exists()) {
+                            persistentArtifacts[id] = CachedArtifact(id, checksum, size, cachedAt)
+                            logger.debug { "Loaded cached artifact: $id" }
+                        }
+                    }
+                }
+                logger.info { "Loaded ${persistentArtifacts.size} cached artifacts from disk" }
+            }
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to load persisted artifacts: ${e.message}" }
+        }
+    }
+    
+    /**
+     * Finalize artifact with decompression support (Fase 2)
+     */
+    private fun finalizeArtifactWithDecompression(download: ArtifactDownload): Boolean {
+        return try {
+            val compressedData = download.buffer.flatMap { it.toList() }.toByteArray()
+            val finalData = when (download.compressionType) {
+                dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_GZIP -> {
+                    decompressGzip(compressedData)
+                }
+                dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_ZSTD -> {
+                    // For now, fallback to no decompression (ZSTD would require additional dependency)
+                    logger.warn { "ZSTD decompression not implemented, using compressed data as-is" }
+                    compressedData
+                }
+                else -> compressedData
+            }
+            
+            val artifactFile = File(artifactDirectory, "${download.artifactId}.artifact")
+            artifactFile.writeBytes(finalData)
+            
+            // Update metadata file
+            saveArtifactMetadata(download.artifactId, calculateSha256(finalData), finalData.size.toLong())
+            
+            logger.info { "Artifact ${download.artifactId} saved and decompressed to ${artifactFile.absolutePath}" }
+            true
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to finalize artifact ${download.artifactId}" }
+            false
+        }
+    }
+    
+    /**
+     * Get final artifact data (decompressed if needed)
+     */
+    private fun getFinalArtifactData(download: ArtifactDownload): ByteArray {
+        val compressedData = download.buffer.flatMap { it.toList() }.toByteArray()
+        return when (download.compressionType) {
+            dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_GZIP -> {
+                decompressGzip(compressedData)
+            }
+            dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_ZSTD -> {
+                logger.warn { "ZSTD decompression not implemented" }
+                compressedData
+            }
+            else -> compressedData
+        }
+    }
+    
+    /**
+     * Build cache status for response
+     */
+    private fun buildCacheStatus(): dev.rubentxu.hodei.pipelines.proto.ArtifactCacheStatus {
+        val totalCacheSize = persistentArtifacts.values.sumOf { it.size }
+        
+        return dev.rubentxu.hodei.pipelines.proto.ArtifactCacheStatus.newBuilder()
+            .setHasArtifact(persistentArtifacts.isNotEmpty())
+            .setCachedArtifactsCount(persistentArtifacts.size)
+            .setCacheSizeBytes(totalCacheSize)
+            .build()
+    }
+    
+    /**
+     * Decompress GZIP data
+     */
+    private fun decompressGzip(compressedData: ByteArray): ByteArray {
+        return GZIPInputStream(ByteArrayInputStream(compressedData)).use { gzipStream ->
+            gzipStream.readBytes()
+        }
+    }
+    
+    /**
+     * Save artifact metadata to disk
+     */
+    private fun saveArtifactMetadata(artifactId: String, checksum: String, size: Long) {
+        try {
+            val metadataFile = File(artifactDirectory, "artifact_metadata.txt")
+            val timestamp = java.time.Instant.now()
+            val line = "$artifactId|$checksum|$size|$timestamp\n"
+            metadataFile.appendText(line)
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to save artifact metadata for $artifactId" }
         }
     }
     
@@ -385,10 +570,22 @@ fun DomainJobStatus.toGrpc(): dev.rubentxu.hodei.pipelines.proto.JobStatus {
 }
 
 /**
- * Data class to manage artifact download state (Fase 1)
+ * Data class to manage artifact download state (Fase 2)
  */
 data class ArtifactDownload(
     val artifactId: String,
     val buffer: MutableList<ByteArray>,
-    val expectedChecksum: String
+    val expectedChecksum: String,
+    val compressionType: dev.rubentxu.hodei.pipelines.proto.CompressionType = dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_NONE,
+    val originalSize: Int = 0
+)
+
+/**
+ * Data class for cached artifacts (Fase 2)
+ */
+data class CachedArtifact(
+    val id: String,
+    val checksum: String,
+    val size: Long,
+    val cachedAt: java.time.Instant
 )

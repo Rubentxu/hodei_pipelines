@@ -153,7 +153,7 @@ message SecurityPolicy {
   map<string, string> environment_restrictions = 5; // Restricciones de variables de entorno
 }
 
-// Definición de artefacto (Fase 1: Básico)
+// Definición de artefacto (Fase 2: Con caché y compresión)
 message Artifact {
   string id = 1; // Identificador único del artefacto
   string name = 2; // Nombre del archivo/artefacto
@@ -161,22 +161,57 @@ message Artifact {
   int64 size = 4; // Tamaño en bytes
   string checksum = 5; // SHA-256 para verificación de integridad
   string path = 6; // Ruta donde debe guardarse en worker
+  string version = 7; // Versión del artefacto para caché
+  bool compress_transfer = 8; // Si comprimir durante transferencia
+  int64 compressed_size = 9; // Tamaño comprimido estimado
 }
 
-// Chunk de datos de artefacto para transferencia (Fase 1: Sin compresión)
+// Chunk de datos de artefacto para transferencia (Fase 2: Con compresión)
 message ArtifactChunk {
   string artifact_id = 1; // ID del artefacto
-  bytes data = 2; // Datos del chunk
+  bytes data = 2; // Datos del chunk (posiblemente comprimidos)
   int32 sequence = 3; // Número de secuencia (0-based)
   bool is_last = 4; // Indica si es el último chunk
+  CompressionType compression = 5; // Tipo de compresión aplicada
+  int32 original_size = 6; // Tamaño original antes de compresión
 }
 
-// Confirmación de recepción de artefacto (Fase 1: Simple)
+// Confirmación de recepción de artefacto (Fase 2: Con estado de caché)
 message ArtifactAck {
   string artifact_id = 1; // ID del artefacto
   bool success = 2; // Si la recepción fue exitosa
   string message = 3; // Mensaje de error en caso de fallo
   string calculated_checksum = 4; // Checksum calculado por el worker
+  bool cache_hit = 5; // Si el artefacto ya estaba en caché
+  ArtifactCacheStatus cache_status = 6; // Estado del caché
+}
+
+// Estado del caché de artefactos
+message ArtifactCacheStatus {
+  bool has_artifact = 1; // Si el worker tiene el artefacto
+  string cached_checksum = 2; // Checksum del artefacto en caché
+  string cached_version = 3; // Versión en caché
+  int64 cache_size_bytes = 4; // Tamaño total del caché
+  int32 cached_artifacts_count = 5; // Número de artefactos en caché
+}
+
+// Verificación de caché antes de transferencia
+message ArtifactCacheQuery {
+  repeated string artifact_ids = 1; // IDs de artefactos a verificar
+  string job_id = 2; // ID del job que requiere los artefactos
+}
+
+// Respuesta de verificación de caché
+message ArtifactCacheResponse {
+  string job_id = 1; // ID del job
+  repeated ArtifactCacheInfo artifacts = 2; // Estado de cada artefacto
+}
+
+message ArtifactCacheInfo {
+  string artifact_id = 1;
+  bool cached = 2; // Si está en caché y es válido
+  string cached_checksum = 3; // Checksum en caché (si exists)
+  bool needs_transfer = 4; // Si necesita ser transferido
 }
 
 // Mensaje para la salida (stdout/stderr) de un Job
@@ -249,6 +284,7 @@ message ServerToWorker {
     ExecuteJobRequest job_request = 1; // Un nuevo job para ejecutar
     ControlSignal control_signal = 2;  // Para enviar señales como "cancelar" o "shutdown"
     ArtifactChunk artifact_chunk = 3;  // Chunk de artefacto para transferir
+    ArtifactCacheQuery cache_query = 4; // Verificación de caché de artefactos
   }
 }
 
@@ -261,6 +297,8 @@ message WorkerToServer {
     WorkerHeartbeat heartbeat = 2;
     // Confirmación de recepción de artefactos
     ArtifactAck artifact_ack = 3;
+    // Respuesta de verificación de caché
+    ArtifactCacheResponse cache_response = 4;
   }
 }
 

@@ -10,8 +10,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import mu.KotlinLogging
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.MessageDigest
+import java.util.zip.GZIPOutputStream
 
 /**
  * gRPC implementation of JobExecutorService
@@ -62,15 +64,28 @@ class JobExecutorServiceImpl(
                             val nextJob = jobQueue.removeFirst()
                             logger.info { "Assigning job ${nextJob.jobDefinition.name} to worker $workerId" }
                             
-                            // First, send artifacts if any
+                            // First, check cache and transfer artifacts if any
                             if (nextJob.config.requiredArtifactsList.isNotEmpty()) {
-                                logger.info { "Transferring ${nextJob.config.requiredArtifactsList.size} artifacts for job ${nextJob.jobDefinition.name}" }
+                                logger.info { "Processing ${nextJob.config.requiredArtifactsList.size} artifacts for job ${nextJob.jobDefinition.name}" }
                                 
+                                // Phase 2: Check cache before transferring
+                                val cacheQuery = ArtifactCacheQuery.newBuilder()
+                                    .addAllArtifactIds(nextJob.config.requiredArtifactsList.map { it.id })
+                                    .setJobId(nextJob.jobDefinition.id.value)
+                                    .build()
+                                
+                                emit(ServerToWorker.newBuilder()
+                                    .setCacheQuery(cacheQuery)
+                                    .build())
+                                
+                                // Small delay to wait for cache response
+                                delay(200)
+                                
+                                // For now, transfer all artifacts (cache response handling will be improved)
                                 for (artifact in nextJob.config.requiredArtifactsList) {
                                     transferArtifactToWorker(artifact, this@flow)
                                 }
                                 
-                                // Small delay to ensure artifacts are processed before job starts
                                 delay(100)
                             }
                             
@@ -134,15 +149,41 @@ class JobExecutorServiceImpl(
                     WorkerToServer.MessageCase.ARTIFACT_ACK -> {
                         val artifactAck = workerMessage.artifactAck
                         if (artifactAck.success) {
-                            logger.info { "Artifact ${artifactAck.artifactId} transferred successfully to worker $workerId" }
-                            // Verify checksum matches
+                            val cacheMsg = if (artifactAck.cacheHit) " (cache hit)" else " (transferred)"
+                            logger.info { "Artifact ${artifactAck.artifactId} handled successfully$cacheMsg on worker $workerId" }
+                            
+                            // Log cache metrics
+                            if (artifactAck.hasCacheStatus()) {
+                                val cacheStatus = artifactAck.cacheStatus
+                                logger.debug { "Worker cache: ${cacheStatus.cachedArtifactsCount} artifacts, ${cacheStatus.cacheSizeBytes} bytes" }
+                            }
+                            
                             if (artifactAck.calculatedChecksum.isNotEmpty()) {
-                                // In a real implementation, you'd verify against the expected checksum
                                 logger.debug { "Worker calculated checksum: ${artifactAck.calculatedChecksum}" }
                             }
                         } else {
                             logger.error { "Artifact ${artifactAck.artifactId} transfer failed: ${artifactAck.message}" }
-                            // Handle transfer failure - could retry or fail the job
+                        }
+                    }
+                    
+                    WorkerToServer.MessageCase.CACHE_RESPONSE -> {
+                        val cacheResponse = workerMessage.cacheResponse
+                        logger.info { "Cache response for job ${cacheResponse.jobId}: ${cacheResponse.artifactsList.size} artifacts checked" }
+                        
+                        val cacheHits = cacheResponse.artifactsList.count { !it.needsTransfer }
+                        val totalArtifacts = cacheResponse.artifactsList.size
+                        val hitRate = if (totalArtifacts > 0) (cacheHits * 100) / totalArtifacts else 0
+                        
+                        logger.info { "Cache hit rate: $hitRate% ($cacheHits/$totalArtifacts)" }
+                        
+                        // Here you would optimize to only transfer artifacts that need it
+                        // For now, we'll just log the cache status
+                        cacheResponse.artifactsList.forEach { artifactInfo ->
+                            if (artifactInfo.cached) {
+                                logger.debug { "Artifact ${artifactInfo.artifactId} is cached with checksum ${artifactInfo.cachedChecksum}" }
+                            } else {
+                                logger.debug { "Artifact ${artifactInfo.artifactId} needs transfer" }
+                            }
                         }
                     }
                     
@@ -197,7 +238,7 @@ class JobExecutorServiceImpl(
     }
     
     /**
-     * Transfer artifact to worker in chunks (Fase 1: Basic implementation)
+     * Transfer artifact to worker in chunks (Fase 2: With compression)
      */
     private suspend fun transferArtifactToWorker(
         artifact: Artifact, 
@@ -207,40 +248,51 @@ class JobExecutorServiceImpl(
         
         try {
             // In a real implementation, you'd read the artifact from storage
-            // For now, we'll simulate with demo data
-            val artifactData = createDemoArtifactData(artifact)
+            val originalData = createDemoArtifactData(artifact)
             
-            val chunkSize = 64 * 1024 // 64KB chunks for Fase 1
+            // Apply compression if requested
+            val (finalData, compressionType, originalSize) = if (artifact.compressTransfer) {
+                val compressed = compressData(originalData, CompressionType.COMPRESSION_GZIP)
+                val compressionRatio = ((originalData.size - compressed.size) * 100) / originalData.size
+                logger.info { "Compressed artifact ${artifact.id}: ${originalData.size} → ${compressed.size} bytes (${compressionRatio}% reduction)" }
+                Triple(compressed, CompressionType.COMPRESSION_GZIP, originalData.size)
+            } else {
+                Triple(originalData, CompressionType.COMPRESSION_NONE, originalData.size)
+            }
+            
+            val chunkSize = 64 * 1024 // 64KB chunks
             var sequence = 0
             var offset = 0
             
-            while (offset < artifactData.size) {
-                val remainingBytes = artifactData.size - offset
+            while (offset < finalData.size) {
+                val remainingBytes = finalData.size - offset
                 val currentChunkSize = minOf(chunkSize, remainingBytes)
-                val chunkData = artifactData.sliceArray(offset until offset + currentChunkSize)
-                val isLast = (offset + currentChunkSize) >= artifactData.size
+                val chunkData = finalData.sliceArray(offset until offset + currentChunkSize)
+                val isLast = (offset + currentChunkSize) >= finalData.size
                 
                 val artifactChunk = ArtifactChunk.newBuilder()
                     .setArtifactId(artifact.id)
                     .setData(com.google.protobuf.ByteString.copyFrom(chunkData))
                     .setSequence(sequence)
                     .setIsLast(isLast)
+                    .setCompression(compressionType)
+                    .setOriginalSize(originalSize)
                     .build()
                 
                 channel.emit(ServerToWorker.newBuilder()
                     .setArtifactChunk(artifactChunk)
                     .build())
                 
-                logger.debug { "Sent chunk $sequence for artifact ${artifact.id} (${chunkData.size} bytes, last: $isLast)" }
+                logger.debug { "Sent chunk $sequence for artifact ${artifact.id} (${chunkData.size} bytes, compression: $compressionType, last: $isLast)" }
                 
                 offset += currentChunkSize
                 sequence++
                 
-                // Small delay between chunks to avoid overwhelming the worker
+                // Small delay between chunks
                 delay(10)
             }
             
-            logger.info { "Completed transfer of artifact ${artifact.id} in $sequence chunks" }
+            logger.info { "Completed transfer of artifact ${artifact.id} in $sequence chunks (compression: $compressionType)" }
             
         } catch (e: Exception) {
             logger.error(e) { "Failed to transfer artifact ${artifact.id}" }
@@ -249,23 +301,70 @@ class JobExecutorServiceImpl(
     }
     
     /**
-     * Create demo artifact data for testing (Fase 1)
+     * Create demo artifact data for testing (Fase 2: More realistic size)
      */
     private fun createDemoArtifactData(artifact: Artifact): ByteArray {
-        // For demonstration, create a simple text file with artifact info
-        val content = """
+        // Create larger demo data to better test compression
+        val baseContent = """
             Artifact: ${artifact.name}
             Type: ${artifact.type}
             ID: ${artifact.id}
             Path: ${artifact.path}
+            Version: ${artifact.version}
             
             This is a demo artifact created for testing the transfer functionality.
             In a real implementation, this would be read from actual storage.
             
             Generated at: ${java.time.Instant.now()}
-        """.trimIndent()
+            
+            """.trimIndent()
         
-        return content.toByteArray(Charsets.UTF_8)
+        // Add repetitive content to make compression more effective
+        val repeatedContent = """
+            # Sample configuration data
+            database.host=localhost
+            database.port=5432
+            database.name=hodei_pipelines
+            database.user=hodei_user
+            database.password=secure_password
+            
+            # Server configuration
+            server.port=8080
+            server.host=0.0.0.0
+            server.threads=10
+            
+            # Logging configuration
+            logging.level=INFO
+            logging.file=/var/log/hodei.log
+            logging.max_size=100MB
+            
+            """.trimIndent()
+        
+        // Repeat the content to simulate a larger file
+        val fullContent = baseContent + (1..20).joinToString("") { "\n$repeatedContent" }
+        
+        return fullContent.toByteArray(Charsets.UTF_8)
+    }
+    
+    /**
+     * Compress data using specified compression type
+     */
+    private fun compressData(data: ByteArray, compressionType: CompressionType): ByteArray {
+        return when (compressionType) {
+            CompressionType.COMPRESSION_GZIP -> {
+                val outputStream = ByteArrayOutputStream()
+                GZIPOutputStream(outputStream).use { gzipStream ->
+                    gzipStream.write(data)
+                }
+                outputStream.toByteArray()
+            }
+            CompressionType.COMPRESSION_ZSTD -> {
+                // For now, fallback to GZIP (ZSTD would require additional dependency)
+                logger.warn { "ZSTD compression not implemented, falling back to GZIP" }
+                compressData(data, CompressionType.COMPRESSION_GZIP)
+            }
+            else -> data
+        }
     }
     
     /**
