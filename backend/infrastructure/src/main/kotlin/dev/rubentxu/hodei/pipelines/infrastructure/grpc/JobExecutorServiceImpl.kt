@@ -27,6 +27,12 @@ class JobExecutorServiceImpl(
     private val logger = KotlinLogging.logger {}
     private val activeWorkers = mutableMapOf<String, WorkerSession>()
     private val jobQueue = mutableListOf<ExecuteJobRequest>()
+    
+    // Cache optimization: Jobs waiting for cache verification
+    private val pendingCacheVerification = mutableMapOf<String, PendingJob>()
+    
+    // Transfer metrics tracking
+    private val transferMetrics = TransferMetricsTracker()
 
     /**
      * Establishes a bidirectional channel for job execution.
@@ -68,31 +74,35 @@ class JobExecutorServiceImpl(
                             if (nextJob.config.requiredArtifactsList.isNotEmpty()) {
                                 logger.info { "Processing ${nextJob.config.requiredArtifactsList.size} artifacts for job ${nextJob.jobDefinition.name}" }
                                 
-                                // Phase 2: Check cache before transferring
+                                // Phase 2: Optimized cache-aware artifact transfer
+                                logger.debug { "Starting optimized artifact transfer for job ${nextJob.jobDefinition.name}" }
+                                
                                 val cacheQuery = ArtifactCacheQuery.newBuilder()
                                     .addAllArtifactIds(nextJob.config.requiredArtifactsList.map { it.id })
                                     .setJobId(nextJob.jobDefinition.id.value)
                                     .build()
                                 
+                                // Store job as pending cache verification
+                                pendingCacheVerification[nextJob.jobDefinition.id.value] = PendingJob(
+                                    jobRequest = nextJob,
+                                    workerId = workerId!!,
+                                    channel = this@flow,
+                                    requestTime = java.time.Instant.now()
+                                )
+                                
+                                // Send cache query
                                 emit(ServerToWorker.newBuilder()
                                     .setCacheQuery(cacheQuery)
                                     .build())
                                 
-                                // Small delay to wait for cache response
-                                delay(200)
-                                
-                                // For now, transfer all artifacts (cache response handling will be improved)
-                                for (artifact in nextJob.config.requiredArtifactsList) {
-                                    transferArtifactToWorker(artifact, this@flow)
-                                }
-                                
-                                delay(100)
+                                logger.debug { "Cache query sent for job ${nextJob.jobDefinition.name}, waiting for response..." }
+                            } else {
+                                // No artifacts required, send job immediately
+                                logger.debug { "No artifacts required for job ${nextJob.jobDefinition.name}, sending job directly" }
+                                emit(ServerToWorker.newBuilder()
+                                    .setJobRequest(nextJob)
+                                    .build())
                             }
-                            
-                            // Then send the job request
-                            emit(ServerToWorker.newBuilder()
-                                .setJobRequest(nextJob)
-                                .build())
                         }
                     }
                     
@@ -176,14 +186,58 @@ class JobExecutorServiceImpl(
                         
                         logger.info { "Cache hit rate: $hitRate% ($cacheHits/$totalArtifacts)" }
                         
-                        // Here you would optimize to only transfer artifacts that need it
-                        // For now, we'll just log the cache status
-                        cacheResponse.artifactsList.forEach { artifactInfo ->
-                            if (artifactInfo.cached) {
-                                logger.debug { "Artifact ${artifactInfo.artifactId} is cached with checksum ${artifactInfo.cachedChecksum}" }
+                        // Track cache metrics
+                        transferMetrics.recordCacheQuery(cacheResponse.jobId, totalArtifacts, cacheHits)
+                        
+                        // Process pending job with optimized artifact transfer
+                        val pendingJob = pendingCacheVerification[cacheResponse.jobId]
+                        if (pendingJob != null) {
+                            // Remove from pending list
+                            pendingCacheVerification.remove(cacheResponse.jobId)
+                            
+                            // Transfer only artifacts that need it
+                            val artifactsToTransfer = cacheResponse.artifactsList
+                                .filter { it.needsTransfer }
+                                .mapNotNull { artifactInfo ->
+                                    pendingJob.jobRequest.config.requiredArtifactsList
+                                        .find { it.id == artifactInfo.artifactId }
+                                }
+                            
+                            if (artifactsToTransfer.isNotEmpty()) {
+                                logger.info { "Transferring ${artifactsToTransfer.size}/${totalArtifacts} artifacts for job ${cacheResponse.jobId}" }
+                                
+                                // Track transfer start
+                                val transferStartTime = java.time.Instant.now()
+                                
+                                for (artifact in artifactsToTransfer) {
+                                    transferArtifactToWorker(artifact, pendingJob.channel)
+                                    transferMetrics.recordArtifactTransfer(artifact.id, artifact.size)
+                                }
+                                
+                                // Record transfer completion time
+                                transferMetrics.recordTransferSession(cacheResponse.jobId, transferStartTime, artifactsToTransfer.size)
+                                
+                                // Small delay between artifacts
+                                delay(50)
                             } else {
-                                logger.debug { "Artifact ${artifactInfo.artifactId} needs transfer" }
+                                logger.info { "All artifacts cached! Skipping transfer for job ${cacheResponse.jobId}" }
                             }
+                            
+                            // Send the job request after artifact handling
+                            pendingJob.channel.emit(ServerToWorker.newBuilder()
+                                .setJobRequest(pendingJob.jobRequest)
+                                .build())
+                                
+                            // Log cache optimization metrics
+                            cacheResponse.artifactsList.forEach { artifactInfo ->
+                                if (artifactInfo.cached) {
+                                    logger.debug { "✓ Cache hit: ${artifactInfo.artifactId} (checksum: ${artifactInfo.cachedChecksum})" }
+                                } else {
+                                    logger.debug { "⚡ Transferring: ${artifactInfo.artifactId}" }
+                                }
+                            }
+                        } else {
+                            logger.warn { "Received cache response for unknown job: ${cacheResponse.jobId}" }
                         }
                     }
                     
@@ -235,6 +289,13 @@ class JobExecutorServiceImpl(
             queuedJobs = jobQueue.size,
             totalJobs = jobQueue.size + activeWorkers.values.sumOf { it.activeJobsCount }
         )
+    }
+    
+    /**
+     * Get transfer metrics
+     */
+    fun getTransferMetrics(): TransferMetrics {
+        return transferMetrics.getMetrics()
     }
     
     /**
@@ -395,4 +456,113 @@ data class SystemStats(
     val activeWorkers: Int,
     val queuedJobs: Int,
     val totalJobs: Int
+)
+
+/**
+ * Represents a job pending cache verification before artifact transfer
+ */
+data class PendingJob(
+    val jobRequest: ExecuteJobRequest,
+    val workerId: String,
+    val channel: kotlinx.coroutines.flow.FlowCollector<ServerToWorker>,
+    val requestTime: java.time.Instant
+)
+
+/**
+ * Transfer metrics tracking
+ */
+class TransferMetricsTracker {
+    private val cacheQueries = mutableListOf<CacheQueryMetric>()
+    private val artifactTransfers = mutableListOf<ArtifactTransferMetric>()
+    private val transferSessions = mutableListOf<TransferSessionMetric>()
+    
+    fun recordCacheQuery(jobId: String, totalArtifacts: Int, cacheHits: Int) {
+        cacheQueries.add(CacheQueryMetric(
+            jobId = jobId,
+            totalArtifacts = totalArtifacts,
+            cacheHits = cacheHits,
+            timestamp = java.time.Instant.now()
+        ))
+    }
+    
+    fun recordArtifactTransfer(artifactId: String, sizeBytes: Long) {
+        artifactTransfers.add(ArtifactTransferMetric(
+            artifactId = artifactId,
+            sizeBytes = sizeBytes,
+            timestamp = java.time.Instant.now()
+        ))
+    }
+    
+    fun recordTransferSession(jobId: String, startTime: java.time.Instant, artifactCount: Int) {
+        transferSessions.add(TransferSessionMetric(
+            jobId = jobId,
+            startTime = startTime,
+            endTime = java.time.Instant.now(),
+            artifactCount = artifactCount
+        ))
+    }
+    
+    fun getMetrics(): TransferMetrics {
+        val totalCacheQueries = cacheQueries.size
+        val totalCacheHits = cacheQueries.sumOf { it.cacheHits }
+        val totalArtifactsQueried = cacheQueries.sumOf { it.totalArtifacts }
+        val averageCacheHitRate = if (totalArtifactsQueried > 0) (totalCacheHits * 100.0) / totalArtifactsQueried else 0.0
+        
+        val totalBytesTransferred = artifactTransfers.sumOf { it.sizeBytes }
+        val averageTransferTime = if (transferSessions.isNotEmpty()) {
+            transferSessions.map { java.time.Duration.between(it.startTime, it.endTime).toMillis() }.average()
+        } else 0.0
+        
+        return TransferMetrics(
+            totalCacheQueries = totalCacheQueries,
+            totalCacheHits = totalCacheHits,
+            averageCacheHitRate = averageCacheHitRate,
+            totalArtifactsTransferred = artifactTransfers.size,
+            totalBytesTransferred = totalBytesTransferred,
+            averageTransferTimeMs = averageTransferTime,
+            transferSessions = transferSessions.size
+        )
+    }
+}
+
+/**
+ * Cache query metric
+ */
+data class CacheQueryMetric(
+    val jobId: String,
+    val totalArtifacts: Int,
+    val cacheHits: Int,
+    val timestamp: java.time.Instant
+)
+
+/**
+ * Artifact transfer metric
+ */
+data class ArtifactTransferMetric(
+    val artifactId: String,
+    val sizeBytes: Long,
+    val timestamp: java.time.Instant
+)
+
+/**
+ * Transfer session metric
+ */
+data class TransferSessionMetric(
+    val jobId: String,
+    val startTime: java.time.Instant,
+    val endTime: java.time.Instant,
+    val artifactCount: Int
+)
+
+/**
+ * Aggregated transfer metrics
+ */
+data class TransferMetrics(
+    val totalCacheQueries: Int,
+    val totalCacheHits: Int,
+    val averageCacheHitRate: Double,
+    val totalArtifactsTransferred: Int,
+    val totalBytesTransferred: Long,
+    val averageTransferTimeMs: Double,
+    val transferSessions: Int
 )
