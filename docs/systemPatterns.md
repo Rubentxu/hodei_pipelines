@@ -61,3 +61,55 @@ graph TD
 - **Inyección de Dependencias (DI)**: Se utiliza para desacoplar los componentes, especialmente para inyectar las implementaciones de los adaptadores en los casos de uso.
 - **Repositorio**: Para abstraer el acceso a los datos de las entidades del dominio.
 - **Caso de Uso (Servicio de Aplicación)**: Para encapsular y orquestar la lógica de negocio de la aplicación.
+
+## 4. Flujo de Ejecución de un Trabajo (Diagrama de Secuencia)
+
+El siguiente diagrama de secuencia ilustra el flujo completo de un trabajo, desde su creación hasta su ejecución en un worker.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Backend (gRPC Server)
+    participant AppUseCase as CreateAndExecuteJobUseCase
+    participant JobRepo as JobRepository
+    participant Orchestrator as OrchestrationCoordinator
+    participant WorkerRepo as WorkerRepository
+    participant Worker (gRPC Client)
+    participant ScriptExecutor as PipelineScriptExecutor
+
+    Client->>+Backend: createJob(jobDefinition)
+    Backend->>+AppUseCase: execute(jobDefinition)
+    AppUseCase->>AppUseCase: Crear entidad Job (status: QUEUED)
+    AppUseCase->>+JobRepo: save(job)
+    JobRepo-->>-AppUseCase: jobId
+    AppUseCase-->>-Backend: jobResponse (con jobId)
+    Backend-->>Client: jobResponse
+
+    loop Ciclo de Orquestación
+        Orchestrator->>Orchestrator: scheduleJobs()
+        Orchestrator->>+JobRepo: findByStatus(QUEUED)
+        JobRepo-->>-Orchestrator: [Job]
+        Orchestrator->>+WorkerRepo: findAvailableWorkers()
+        WorkerRepo-->>-Orchestrator: [Worker]
+        Orchestrator->>Orchestrator: Asignar Job a Worker
+    end
+
+    Orchestrator->>+Worker: execute(job)
+    Note right of Worker: Canal gRPC bidireccional
+
+    Worker->>+ScriptExecutor: execute(job.payload)
+    ScriptExecutor->>ScriptExecutor: Ejecutar script/comando
+    
+    loop Flujo de Logs y Estado
+        ScriptExecutor-->>Worker: "Log line 1"
+        Worker-->>Backend: send(logEvent)
+        ScriptExecutor-->>Worker: "Log line 2"
+        Worker-->>Backend: send(logEvent)
+    end
+
+    ScriptExecutor-->>-Worker: ExecutionResult (SUCCESS/FAILURE)
+    Worker->>Backend: send(jobCompletedEvent)
+    Backend->>+JobRepo: save(job) (actualizar estado)
+    JobRepo-->>-Backend: OK
+    Worker-->>-Orchestrator: OK
+```
