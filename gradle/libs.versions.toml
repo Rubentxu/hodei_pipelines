@@ -19,6 +19,8 @@ protobuf = "4.31.1"
 protobufPlugin = "0.9.5"
 osdetector = "1.7.3"
 kubernetesClient = "20.0.0"
+mockito = "5.8.0"
+mockitoKotlin = "5.2.1"
 
 
 [libraries]
@@ -80,6 +82,10 @@ kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.
 
 # MockK
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+
+# Mockito
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockitoKotlin" }
 
 # JUnit Jupiter
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junitJupiter" }
