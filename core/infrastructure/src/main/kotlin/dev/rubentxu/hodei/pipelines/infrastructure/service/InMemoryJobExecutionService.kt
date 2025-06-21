@@ -39,6 +39,8 @@ class InMemoryJobExecutor : JobExecutor {
             val payloadDescription = when (val payload = job.definition.payload) {
                 is JobPayload.Command -> "Command: ${payload.commandLine.joinToString(" ")}"
                 is JobPayload.Script -> "Script"
+            is JobPayload.CompiledScript -> "Compiled Script: ${payload.content.take(50)}..."
+                else -> "Unknown payload type"
             }
             val output = "Job '${job.definition.name}' executed successfully.\n$payloadDescription\nSimulated output: Hello from worker ${workerId.value}"
             logger.info { "Job ${job.id.value} completed successfully" }

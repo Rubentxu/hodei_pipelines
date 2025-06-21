@@ -1,5 +1,7 @@
 package dev.rubentxu.hodei.pipelines.infrastructure.script
 
+import dev.rubentxu.hodei.pipelines.port.JobOutputChunk
+import kotlinx.coroutines.channels.Channel
 import kotlin.script.experimental.annotations.KotlinScript
 
 
@@ -17,16 +19,20 @@ abstract class PipelineScript
  * Pipeline Context - provides the DSL context similar to Gradle's Project
  */
 class PipelineContext(
+    val jobId: dev.rubentxu.hodei.pipelines.domain.job.JobId,
+    val workerId: dev.rubentxu.hodei.pipelines.domain.worker.WorkerId,
     private val environment: Map<String, String>,
-    private val outputCapture: StringBuilder
+    val outputChannel: Channel<JobOutputChunk>
 ) {
     val tasks = TaskContainer(this)
     val env = mutableMapOf<String, String>().apply { putAll(environment) }
 
     fun println(message: Any?) {
         val text = message.toString()
-        outputCapture.appendLine(text)
-        kotlin.io.println(text) // Also print to actual stdout for debugging
+        // Enviamos la salida al canal en tiempo real
+        kotlinx.coroutines.runBlocking {
+            outputChannel.send(JobOutputChunk(text.toByteArray(), isError = false))
+        }
     }
 
     fun sh(command: String): String {
@@ -35,16 +41,34 @@ class PipelineContext(
                 .redirectErrorStream(true)
                 .start()
 
-            val output = process.inputStream.bufferedReader().readText()
+            val output = StringBuilder()
+            // Leemos la salida línea por línea y la enviamos en tiempo real
+            process.inputStream.bufferedReader().useLines { lines ->
+                lines.forEach { line ->
+                    kotlinx.coroutines.runBlocking {
+                        outputChannel.send(JobOutputChunk(line.toByteArray(), isError = false))
+                    }
+                    output.appendLine(line)
+                }
+            }
+
             val exitCode = process.waitFor()
 
             if (exitCode != 0) {
-                throw RuntimeException("Command '$command' failed with exit code $exitCode and output:\n$output")
+                val errorMsg = "Command '$command' failed with exit code $exitCode"
+                kotlinx.coroutines.runBlocking {
+                    outputChannel.send(JobOutputChunk(errorMsg.toByteArray(), isError = true))
+                }
+                throw RuntimeException("$errorMsg and output:\n${output}")
             }
-            println(output)
-            return output
+
+            return output.toString()
         } catch (e: Exception) {
-            throw RuntimeException("Failed to execute command '$command'", e)
+            val errorMsg = "Failed to execute command '$command': ${e.message}"
+            kotlinx.coroutines.runBlocking {
+                outputChannel.send(JobOutputChunk(errorMsg.toByteArray(), isError = true))
+            }
+            throw RuntimeException(errorMsg, e)
         }
     }
 }

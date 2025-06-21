@@ -58,6 +58,15 @@ object JobMappers {
                 val scriptPayload = ScriptPayload.newBuilder().setContent(payload.content).build()
                 builder.setScript(scriptPayload)
             }
+            is JobPayload.CompiledScript -> {
+                val scriptPayload = ScriptPayload.newBuilder().setContent(payload.content).build()
+                builder.setScript(scriptPayload)
+            }
+            else -> {
+                // For new payload types, default to script for now
+                val scriptPayload = ScriptPayload.newBuilder().setContent("// Unsupported payload type").build()
+                builder.setScript(scriptPayload)
+            }
         }
         return builder.build()
     }

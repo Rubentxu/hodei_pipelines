@@ -17,4 +17,27 @@ sealed interface JobPayload {
      * @property commandLine The list of command-line arguments.
      */
     data class Command(val commandLine: List<String>) : JobPayload
+    
+    /**
+     * A payload that contains a Kotlin script to be compiled and executed.
+     * @property content The raw Kotlin script content.
+     * @property libraries List of library dependencies.
+     */
+    data class CompiledScript(
+        val content: String,
+        val libraries: List<String> = emptyList()
+    ) : JobPayload
+    
+
+}
+
+/**
+ * Job execution types
+ */
+enum class JobType {
+    SCRIPT,
+    COMMAND,
+    COMPILED_SCRIPT,
+    DOCKER,
+    KUBERNETES
 }

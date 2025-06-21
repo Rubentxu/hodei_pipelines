@@ -1,40 +1,31 @@
 package dev.rubentxu.hodei.pipelines.infrastructure.worker
 
 import com.google.protobuf.ByteString
-import dev.rubentxu.hodei.pipelines.domain.job.Job as DomainJob
-import dev.rubentxu.hodei.pipelines.domain.job.JobDefinition as DomainJobDefinition
-import dev.rubentxu.hodei.pipelines.domain.job.JobId as DomainJobId
-import dev.rubentxu.hodei.pipelines.domain.job.JobPayload as DomainJobPayload
-import dev.rubentxu.hodei.pipelines.domain.job.JobStatus as DomainJobStatus
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
 import dev.rubentxu.hodei.pipelines.infrastructure.script.PipelineScriptExecutor
 import dev.rubentxu.hodei.pipelines.port.JobExecutionEvent
-import dev.rubentxu.hodei.pipelines.proto.ControlSignal
-import dev.rubentxu.hodei.pipelines.proto.ExecuteJobRequest
+import dev.rubentxu.hodei.pipelines.proto.*
 import dev.rubentxu.hodei.pipelines.proto.JobExecutorServiceGrpcKt.JobExecutorServiceCoroutineStub
-import dev.rubentxu.hodei.pipelines.proto.JobOutputAndStatus
-import dev.rubentxu.hodei.pipelines.proto.ServerToWorker
-import dev.rubentxu.hodei.pipelines.proto.WorkerHeartbeat
-import dev.rubentxu.hodei.pipelines.proto.WorkerIdentifier
 import dev.rubentxu.hodei.pipelines.proto.WorkerManagementServiceGrpcKt.WorkerManagementServiceCoroutineStub
-import dev.rubentxu.hodei.pipelines.proto.WorkerRegistrationRequest
-import dev.rubentxu.hodei.pipelines.proto.WorkerToServer
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.receiveAsFlow
 import mu.KotlinLogging
+import java.io.ByteArrayInputStream
 import java.io.Closeable
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
-import java.io.ByteArrayInputStream
+import dev.rubentxu.hodei.pipelines.domain.job.Job as DomainJob
+import dev.rubentxu.hodei.pipelines.domain.job.JobDefinition as DomainJobDefinition
+import dev.rubentxu.hodei.pipelines.domain.job.JobId as DomainJobId
+import dev.rubentxu.hodei.pipelines.domain.job.JobPayload as DomainJobPayload
+import dev.rubentxu.hodei.pipelines.domain.job.JobStatus as DomainJobStatus
 import dev.rubentxu.hodei.pipelines.proto.JobDefinition as GrpcJobDefinition
 
 private val logger = KotlinLogging.logger {}
@@ -52,22 +43,23 @@ class PipelineWorker(
         .build()
 
     private val jobExecutorStub: JobExecutorServiceCoroutineStub = JobExecutorServiceCoroutineStub(channel)
-    private val workerManagementStub: WorkerManagementServiceCoroutineStub = WorkerManagementServiceCoroutineStub(channel)
+    private val workerManagementStub: WorkerManagementServiceCoroutineStub =
+        WorkerManagementServiceCoroutineStub(channel)
 
     private val workerScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    
+
     // Artifact management (Fase 2: With cache)
     private val artifactCache = mutableMapOf<String, ArtifactDownload>()
     private val artifactDirectory = File(System.getProperty("java.io.tmpdir"), "hodei-artifacts-$workerId")
     private val persistentArtifacts = mutableMapOf<String, CachedArtifact>()
-    
+
     init {
         // Create artifact directory
         if (!artifactDirectory.exists()) {
             artifactDirectory.mkdirs()
             logger.info { "Created artifact directory: ${artifactDirectory.absolutePath}" }
         }
-        
+
         // Load existing artifacts from cache
         loadPersistedArtifacts()
     }
@@ -129,15 +121,17 @@ class PipelineWorker(
                                         .collect { message -> toServerChannel.send(message) }
                                 }
                             }
+
                             ServerToWorker.MessageCase.CONTROL_SIGNAL -> {
                                 val controlSignal = serverMessage.controlSignal
                                 logger.info { "Received control signal: ${controlSignal.type}" }
                                 // Handle control signals (e.g., cancel job)
                             }
+
                             ServerToWorker.MessageCase.ARTIFACT_CHUNK -> {
                                 val artifactChunk = serverMessage.artifactChunk
                                 logger.debug { "Received artifact chunk for ${artifactChunk.artifactId}, sequence ${artifactChunk.sequence}" }
-                                
+
                                 launch {
                                     val ack = handleArtifactChunk(artifactChunk)
                                     val ackMessage = WorkerToServer.newBuilder()
@@ -146,10 +140,11 @@ class PipelineWorker(
                                     toServerChannel.send(ackMessage)
                                 }
                             }
+
                             ServerToWorker.MessageCase.CACHE_QUERY -> {
                                 val cacheQuery = serverMessage.cacheQuery
                                 logger.debug { "Received cache query for job ${cacheQuery.jobId} with ${cacheQuery.artifactIdsList.size} artifacts" }
-                                
+
                                 launch {
                                     val cacheResponse = handleCacheQuery(cacheQuery)
                                     val responseMessage = WorkerToServer.newBuilder()
@@ -158,6 +153,7 @@ class PipelineWorker(
                                     toServerChannel.send(responseMessage)
                                 }
                             }
+
                             else -> {
                                 logger.warn { "Received unknown message from server: ${serverMessage.messageCase}" }
                             }
@@ -183,7 +179,17 @@ class PipelineWorker(
             definition = domainJobDef,
             status = DomainJobStatus.QUEUED
         )
+        logger.info { "Executing job ${domainJob.id.value} of type ${determineJobTypeFromPayload(domainJobDef.payload)}" }
         return scriptExecutor.execute(domainJob, WorkerId(workerId))
+    }
+    
+    private fun determineJobTypeFromPayload(payload: DomainJobPayload): String {
+        return when (payload) {
+            is DomainJobPayload.Script -> "SCRIPT"
+            is DomainJobPayload.Command -> "COMMAND"
+            is DomainJobPayload.CompiledScript -> "COMPILED_SCRIPT"
+            else -> "UNKNOWN"
+        }
     }
 
     private fun convertEventToWorkerMessage(event: JobExecutionEvent): WorkerToServer {
@@ -197,6 +203,7 @@ class PipelineWorker(
                             .build()
                     )
                     .build()
+
             is JobExecutionEvent.OutputReceived ->
                 JobOutputAndStatus.newBuilder()
                     .setOutputChunk(
@@ -204,15 +211,18 @@ class PipelineWorker(
                             .setJobId(event.jobId.toGrpc())
                             .setData(ByteString.copyFrom(event.chunk.data))
                             .setIsStderr(event.chunk.isError)
-                            .setTimestamp(com.google.protobuf.Timestamp.newBuilder()
-                                .setSeconds(event.chunk.timestamp.epochSecond)
-                                .setNanos(event.chunk.timestamp.nano)
-                                .build())
+                            .setTimestamp(
+                                com.google.protobuf.Timestamp.newBuilder()
+                                    .setSeconds(event.chunk.timestamp.epochSecond)
+                                    .setNanos(event.chunk.timestamp.nano)
+                                    .build()
+                            )
                             .setCompressed(false)
                             .setCompressionType(dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_NONE)
                             .build()
                     )
                     .build()
+
             is JobExecutionEvent.Completed ->
                 JobOutputAndStatus.newBuilder()
                     .setStatusUpdate(
@@ -224,6 +234,7 @@ class PipelineWorker(
                             .build()
                     )
                     .build()
+
             is JobExecutionEvent.Failed ->
                 JobOutputAndStatus.newBuilder()
                     .setStatusUpdate(
@@ -235,6 +246,7 @@ class PipelineWorker(
                             .build()
                     )
                     .build()
+
             is JobExecutionEvent.Cancelled ->
                 JobOutputAndStatus.newBuilder()
                     .setStatusUpdate(
@@ -245,6 +257,7 @@ class PipelineWorker(
                             .build()
                     )
                     .build()
+
             else -> throw IllegalArgumentException("Unknown event type: ${event::class.simpleName}")
         }
         return WorkerToServer.newBuilder().setJobOutputAndStatus(jobOutputAndStatus).build()
@@ -277,14 +290,14 @@ class PipelineWorker(
         }
         return scriptBuilder.toString()
     }
-    
+
     /**
      * Handle incoming artifact chunk (Fase 2: With compression and enhanced cache)
      */
     private suspend fun handleArtifactChunk(chunk: dev.rubentxu.hodei.pipelines.proto.ArtifactChunk): dev.rubentxu.hodei.pipelines.proto.ArtifactAck {
         return try {
             val artifactId = chunk.artifactId
-            
+
             // Check if artifact is already cached
             val cachedArtifact = persistentArtifacts[artifactId]
             if (cachedArtifact != null) {
@@ -298,7 +311,7 @@ class PipelineWorker(
                     .setCacheStatus(buildCacheStatus())
                     .build()
             }
-            
+
             // Get or create artifact download state
             val download = artifactCache.getOrPut(artifactId) {
                 ArtifactDownload(
@@ -309,21 +322,21 @@ class PipelineWorker(
                     originalSize = chunk.originalSize
                 )
             }
-            
+
             // Add chunk data to buffer
             download.buffer.add(chunk.data.toByteArray())
-            
+
             logger.debug { "Added chunk ${chunk.sequence} for artifact $artifactId (${chunk.data.size()} bytes, compression: ${chunk.compression})" }
-            
+
             // If this is the last chunk, finalize the artifact
             if (chunk.isLast) {
                 val success = finalizeArtifactWithDecompression(download)
-                
+
                 if (success) {
                     // Calculate final checksum of decompressed data
                     val finalData = getFinalArtifactData(download)
                     val calculatedChecksum = calculateSha256(finalData)
-                    
+
                     // Store in persistent cache
                     persistentArtifacts[artifactId] = CachedArtifact(
                         id = artifactId,
@@ -331,12 +344,12 @@ class PipelineWorker(
                         size = finalData.size.toLong(),
                         cachedAt = java.time.Instant.now()
                     )
-                    
+
                     logger.info { "Successfully received and cached artifact $artifactId (${finalData.size} bytes)" }
-                    
+
                     // Remove from temporary cache
                     artifactCache.remove(artifactId)
-                    
+
                     dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
                         .setArtifactId(artifactId)
                         .setSuccess(true)
@@ -362,10 +375,10 @@ class PipelineWorker(
                     .setMessage("Chunk ${chunk.sequence} received")
                     .build()
             }
-            
+
         } catch (e: Exception) {
             logger.error(e) { "Error handling artifact chunk for ${chunk.artifactId}" }
-            
+
             dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
                 .setArtifactId(chunk.artifactId)
                 .setSuccess(false)
@@ -374,7 +387,7 @@ class PipelineWorker(
                 .build()
         }
     }
-    
+
     /**
      * Finalize artifact by writing to disk
      */
@@ -382,26 +395,26 @@ class PipelineWorker(
         return try {
             val finalData = download.buffer.flatMap { it.toList() }.toByteArray()
             val artifactFile = File(artifactDirectory, "${download.artifactId}.artifact")
-            
+
             artifactFile.writeBytes(finalData)
             logger.info { "Artifact ${download.artifactId} saved to ${artifactFile.absolutePath}" }
-            
+
             true
         } catch (e: Exception) {
             logger.error(e) { "Failed to save artifact ${download.artifactId}" }
             false
         }
     }
-    
+
     /**
      * Handle cache query from server (Fase 2)
      */
     private suspend fun handleCacheQuery(query: dev.rubentxu.hodei.pipelines.proto.ArtifactCacheQuery): dev.rubentxu.hodei.pipelines.proto.ArtifactCacheResponse {
         logger.debug { "Processing cache query for job ${query.jobId} with ${query.artifactIdsList.size} artifacts" }
-        
+
         val artifactInfos = query.artifactIdsList.map { artifactId ->
             val cachedArtifact = persistentArtifacts[artifactId]
-            
+
             dev.rubentxu.hodei.pipelines.proto.ArtifactCacheInfo.newBuilder()
                 .setArtifactId(artifactId)
                 .setCached(cachedArtifact != null)
@@ -409,13 +422,13 @@ class PipelineWorker(
                 .setNeedsTransfer(cachedArtifact == null)
                 .build()
         }
-        
+
         return dev.rubentxu.hodei.pipelines.proto.ArtifactCacheResponse.newBuilder()
             .setJobId(query.jobId)
             .addAllArtifacts(artifactInfos)
             .build()
     }
-    
+
     /**
      * Load persisted artifacts from disk (Fase 2)
      */
@@ -429,8 +442,12 @@ class PipelineWorker(
                         val id = parts[0]
                         val checksum = parts[1]
                         val size = parts[2].toLongOrNull() ?: 0L
-                        val cachedAt = try { java.time.Instant.parse(parts[3]) } catch (e: Exception) { java.time.Instant.now() }
-                        
+                        val cachedAt = try {
+                            java.time.Instant.parse(parts[3])
+                        } catch (e: Exception) {
+                            java.time.Instant.now()
+                        }
+
                         // Verify artifact file still exists
                         val artifactFile = File(artifactDirectory, "$id.artifact")
                         if (artifactFile.exists()) {
@@ -445,7 +462,7 @@ class PipelineWorker(
             logger.warn(e) { "Failed to load persisted artifacts: ${e.message}" }
         }
     }
-    
+
     /**
      * Finalize artifact with decompression support (Fase 2)
      */
@@ -456,20 +473,22 @@ class PipelineWorker(
                 dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_GZIP -> {
                     decompressGzip(compressedData)
                 }
+
                 dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_ZSTD -> {
                     // For now, fallback to no decompression (ZSTD would require additional dependency)
                     logger.warn { "ZSTD decompression not implemented, using compressed data as-is" }
                     compressedData
                 }
+
                 else -> compressedData
             }
-            
+
             val artifactFile = File(artifactDirectory, "${download.artifactId}.artifact")
             artifactFile.writeBytes(finalData)
-            
+
             // Update metadata file
             saveArtifactMetadata(download.artifactId, calculateSha256(finalData), finalData.size.toLong())
-            
+
             logger.info { "Artifact ${download.artifactId} saved and decompressed to ${artifactFile.absolutePath}" }
             true
         } catch (e: Exception) {
@@ -477,7 +496,7 @@ class PipelineWorker(
             false
         }
     }
-    
+
     /**
      * Get final artifact data (decompressed if needed)
      */
@@ -487,27 +506,29 @@ class PipelineWorker(
             dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_GZIP -> {
                 decompressGzip(compressedData)
             }
+
             dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_ZSTD -> {
                 logger.warn { "ZSTD decompression not implemented" }
                 compressedData
             }
+
             else -> compressedData
         }
     }
-    
+
     /**
      * Build cache status for response
      */
     private fun buildCacheStatus(): dev.rubentxu.hodei.pipelines.proto.ArtifactCacheStatus {
         val totalCacheSize = persistentArtifacts.values.sumOf { it.size }
-        
+
         return dev.rubentxu.hodei.pipelines.proto.ArtifactCacheStatus.newBuilder()
             .setHasArtifact(persistentArtifacts.isNotEmpty())
             .setCachedArtifactsCount(persistentArtifacts.size)
             .setCacheSizeBytes(totalCacheSize)
             .build()
     }
-    
+
     /**
      * Decompress GZIP data
      */
@@ -516,7 +537,7 @@ class PipelineWorker(
             gzipStream.readBytes()
         }
     }
-    
+
     /**
      * Save artifact metadata to disk
      */
@@ -530,7 +551,7 @@ class PipelineWorker(
             logger.warn(e) { "Failed to save artifact metadata for $artifactId" }
         }
     }
-    
+
     /**
      * Calculate SHA-256 checksum
      */

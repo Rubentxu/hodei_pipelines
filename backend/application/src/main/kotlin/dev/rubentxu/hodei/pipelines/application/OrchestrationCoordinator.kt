@@ -371,9 +371,16 @@ class OrchestrationCoordinator(
                             orchestrationEvents.emit(JobRetried(queuedJob.job.id, retryJob.retryCount))
                         }
                     }
-
-                    is JobExecutionEvent.Cancelled -> TODO()
-                    is JobExecutionEvent.OutputReceived -> TODO()
+                    is JobExecutionEvent.Cancelled -> {
+                        logger.info { "Job ${queuedJob.job.id.value} was cancelled" }
+                        orchestrationEvents.emit(JobCompleted(queuedJob.job.id, workerId, false))
+                    }
+                    is JobExecutionEvent.OutputReceived -> {
+                        logger.trace { "Job ${queuedJob.job.id.value} produced output" }
+                    }
+                    else -> {
+                        logger.debug { "Received other job execution event: ${event::class.simpleName}" }
+                    }
                 }
             }
             
