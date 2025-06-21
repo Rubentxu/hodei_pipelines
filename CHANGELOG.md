@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-## [0.3.0] - 2024-12-21
+## [0.3.0] - 2025-06-21
 
 ### Added
 - **Phase 2 Artifact Transfer System**
@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New protocol messages: `ArtifactCacheQuery`, `ArtifactCacheResponse`, `ArtifactCacheInfo`, `ArtifactCacheStatus`
 - Added compression types: `COMPRESSION_GZIP`, `COMPRESSION_ZSTD` (GZIP implemented)
 
-## [0.2.0] - 2024-12-21
+## [0.2.0] - 2025-06-21
 
 ### Added
 - **Phase 1 Artifact Transfer System**
@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced protobuf messages: `Artifact`, `ArtifactChunk`, `ArtifactAck`
 - Added compression type enum (preparation for Phase 2)
 
-## [0.1.0] - 2024-12-21
+## [0.1.0] - 2025-06-20
 
 ### Added
 - **Initial Project Setup**
