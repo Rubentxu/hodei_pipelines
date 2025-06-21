@@ -55,11 +55,10 @@ class SimpleWorkerRegistrationTest {
         worker.use { w ->
             w.start()
             
-            // Wait for registration with timeout
-            withTimeout(3000) {
-                while (!server.workerManagementService.isWorkerRegistered(workerId)) {
-                    delay(100)
-                }
+            // Wait for worker connection using server utility method
+            val connected = server.waitForWorkerConnection(workerId, 5000)
+            assertTrue(connected) {
+                "Worker should connect within timeout"
             }
             
             // Then
@@ -120,15 +119,17 @@ class SimpleWorkerRegistrationTest {
         worker.use { w ->
             w.start()
             
-            // Wait for registration
-            withTimeout(3000) {
-                while (!server.workerManagementService.isWorkerRegistered(workerId)) {
-                    delay(100)
-                }
+            // Wait for worker connection
+            val connected = server.waitForWorkerConnection(workerId, 5000)
+            assertTrue(connected) {
+                "Worker should connect within timeout"
             }
             
-            // Wait for some heartbeats
-            delay(2000)
+            // Wait specifically for heartbeat messages
+            val heartbeatReceived = server.jobExecutorService.waitForMessageType("HEARTBEAT", 3000)
+            assertTrue(heartbeatReceived) {
+                "Should receive heartbeat messages within timeout"
+            }
             
             // Then
             assertTrue(server.workerManagementService.isWorkerRegistered(workerId))
@@ -136,7 +137,7 @@ class SimpleWorkerRegistrationTest {
             val messages = server.jobExecutorService.getReceivedMessages()
             val heartbeats = messages.filter { it.messageType == "HEARTBEAT" }
             assertTrue(heartbeats.isNotEmpty()) {
-                "Should have received heartbeat messages"
+                "Should have received heartbeat messages. Received: ${messages.map { it.messageType }}"
             }
         }
     }
@@ -156,23 +157,27 @@ class SimpleWorkerRegistrationTest {
         // When
         worker.start()
         
-        // Wait for connection
-        withTimeout(3000) {
-            while (!server.workerManagementService.isWorkerRegistered(workerId)) {
-                delay(100)
-            }
+        // Wait for worker connection
+        val connected = server.waitForWorkerConnection(workerId, 5000)
+        assertTrue(connected) {
+            "Worker should connect within timeout"
         }
         
         assertTrue(server.workerManagementService.isWorkerRegistered(workerId))
         
         // Close worker
         worker.close()
-        delay(500) // Wait for cleanup
+        
+        // Wait for disconnection
+        val disconnected = server.jobExecutorService.waitForWorkerDisconnection(workerId, 3000)
+        assertTrue(disconnected) {
+            "Worker should disconnect from job execution service within timeout"
+        }
         
         // Then - Note: Worker stays registered but disconnects from job execution
         val connectedWorkers = server.jobExecutorService.getConnectedWorkers()
         assertFalse(connectedWorkers.containsKey(workerId)) {
-            "Worker should be disconnected from job execution service"
+            "Worker should be disconnected from job execution service. Connected: ${connectedWorkers.keys}"
         }
     }
 }

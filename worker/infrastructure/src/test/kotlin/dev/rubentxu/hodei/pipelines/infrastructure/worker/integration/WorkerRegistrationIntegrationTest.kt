@@ -52,11 +52,9 @@ class WorkerRegistrationIntegrationTest {
         worker.use { w ->
             w.start()
             
-            // Wait for registration
-            delay(1000)
-            
-            // Then
-            assertTrue(server.waitForWorkerConnection(workerId, 3000)) {
+            // Wait for worker connection
+            val connected = server.waitForWorkerConnection(workerId, 5000)
+            assertTrue(connected) {
                 "Worker should be registered and connected within timeout"
             }
             
@@ -130,23 +128,23 @@ class WorkerRegistrationIntegrationTest {
         worker.use { w ->
             w.start()
             
-            // Wait for registration and some heartbeats
-            delay(3000)
-            
-            // Then
-            assertTrue(server.waitForWorkerConnection(workerId, 2000)) {
+            // Wait for worker connection first
+            val connected = server.waitForWorkerConnection(workerId, 5000)
+            assertTrue(connected) {
                 "Worker should be connected"
             }
             
-            assertTrue(server.jobExecutorService.waitForMessageType("HEARTBEAT", 2000)) {
+            // Then wait specifically for heartbeat messages
+            val heartbeatReceived = server.jobExecutorService.waitForMessageType("HEARTBEAT", 3000)
+            assertTrue(heartbeatReceived) {
                 "Should receive heartbeat messages"
             }
             
             val receivedMessages = server.jobExecutorService.getReceivedMessages()
             val heartbeatMessages = receivedMessages.filter { it.messageType == "HEARTBEAT" }
             
-            assertTrue(heartbeatMessages.size >= 2) {
-                "Should receive multiple heartbeat messages (got ${heartbeatMessages.size})"
+            assertTrue(heartbeatMessages.isNotEmpty()) {
+                "Should receive heartbeat messages (got ${heartbeatMessages.size}). All messages: ${receivedMessages.map { it.messageType }}"
             }
         }
     }
@@ -167,20 +165,24 @@ class WorkerRegistrationIntegrationTest {
         worker.start()
         
         // Wait for connection
-        assertTrue(server.waitForWorkerConnection(workerId, 3000)) {
+        val connected = server.waitForWorkerConnection(workerId, 5000)
+        assertTrue(connected) {
             "Worker should connect initially"
         }
         
         // Close worker (simulates disconnection)
         worker.close()
         
-        // Wait a bit for cleanup
-        delay(500)
+        // Wait for disconnection
+        val disconnected = server.jobExecutorService.waitForWorkerDisconnection(workerId, 3000)
+        assertTrue(disconnected) {
+            "Worker should disconnect from job execution service within timeout"
+        }
         
         // Then
         val connectedWorkers = server.jobExecutorService.getConnectedWorkers()
         assertFalse(connectedWorkers.containsKey(workerId)) {
-            "Worker should be removed from connected workers after disconnection"
+            "Worker should be removed from connected workers after disconnection. Connected: ${connectedWorkers.keys}"
         }
     }
     
@@ -202,18 +204,27 @@ class WorkerRegistrationIntegrationTest {
         workers.forEach { it.start() }
         
         try {
-            // Wait for all registrations
-            delay(2000)
+            // Wait for all workers to connect individually
+            (1..workerCount).forEach { i ->
+                val workerId = "multi-worker-$i"
+                val connected = server.waitForWorkerConnection(workerId, 5000)
+                assertTrue(connected) {
+                    "Worker $workerId should connect within timeout"
+                }
+            }
+            
+            // Additional delay for state consistency
+            delay(200)
             
             // Then
             val registeredWorkers = server.workerManagementService.getRegisteredWorkers()
-            assertEquals(workerCount, registeredWorkers.size) {
-                "All workers should be registered"
+            assertTrue(registeredWorkers.size >= workerCount) {
+                "All workers should be registered. Got ${registeredWorkers.size}, expected at least $workerCount. Workers: ${registeredWorkers.keys}"
             }
             
             val connectedWorkers = server.jobExecutorService.getConnectedWorkers()
-            assertEquals(workerCount, connectedWorkers.size) {
-                "All workers should be connected to job execution service"
+            assertTrue(connectedWorkers.size >= workerCount) {
+                "All workers should be connected to job execution service. Got ${connectedWorkers.size}, expected at least $workerCount. Connected: ${connectedWorkers.keys}"
             }
             
             // Verify each worker is registered

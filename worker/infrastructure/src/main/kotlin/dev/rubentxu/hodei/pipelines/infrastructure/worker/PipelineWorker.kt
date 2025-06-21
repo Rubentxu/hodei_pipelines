@@ -265,11 +265,11 @@ class PipelineWorker(
 
     override fun close() {
         logger.info { "Shutting down worker $workerId..." }
+        workerScope.cancel()
         runBlocking {
             unregisterWorker()
         }
         channel.shutdown().awaitTermination(5, TimeUnit.SECONDS)
-        workerScope.cancel()
     }
 
     private suspend fun unregisterWorker() {

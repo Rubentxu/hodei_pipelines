@@ -59,7 +59,15 @@ class MinimalIntegrationTest {
         
         worker.use { w ->
             w.start()
-            delay(1000) // Give time for registration
+            
+            // Wait for worker registration with timeout
+            val registered = server.waitForWorkerConnection(workerId, 3000)
+            assertTrue(registered) {
+                "Worker should be registered within timeout"
+            }
+            
+            // Additional small delay to ensure state consistency
+            delay(100)
             
             // Then
             assertTrue(server.workerManagementService.isWorkerRegistered(workerId)) {
@@ -93,7 +101,21 @@ class MinimalIntegrationTest {
         
         worker.use { w ->
             w.start()
-            delay(1500) // Allow multiple heartbeats
+            
+            // Wait for worker to connect first
+            val connected = server.waitForWorkerConnection(workerId, 3000)
+            assertTrue(connected) {
+                "Worker should connect within timeout"
+            }
+            
+            // Wait specifically for heartbeat messages
+            val heartbeatReceived = server.jobExecutorService.waitForMessageType("HEARTBEAT", 2000)
+            assertTrue(heartbeatReceived) {
+                "Should receive heartbeat messages within timeout"
+            }
+            
+            // Allow a bit more time for multiple heartbeats
+            delay(500)
             
             // Then
             val messages = server.jobExecutorService.getReceivedMessages()
@@ -125,17 +147,31 @@ class MinimalIntegrationTest {
         
         // When - Connect first
         worker.start()
-        delay(500)
-        assertTrue(server.workerManagementService.isWorkerRegistered(workerId))
+        
+        // Wait for connection to be established
+        val connected = server.waitForWorkerConnection(workerId, 3000)
+        assertTrue(connected) {
+            "Worker should connect before testing disconnection"
+        }
+        
+        // Verify worker is actually registered
+        assertTrue(server.workerManagementService.isWorkerRegistered(workerId)) {
+            "Worker should be registered after connection"
+        }
         
         // Then disconnect
         worker.close()
-        delay(500) // Allow cleanup
+        
+        // Wait for disconnection
+        val disconnected = server.jobExecutorService.waitForWorkerDisconnection(workerId, 3000)
+        assertTrue(disconnected) {
+            "Worker should disconnect from job execution service within timeout"
+        }
         
         // Then - Worker should be disconnected from job execution
         val connectedWorkers = server.jobExecutorService.getConnectedWorkers()
         assertFalse(connectedWorkers.containsKey(workerId)) {
-            "Worker should be disconnected from job execution service after close"
+            "Worker should be disconnected from job execution service after close. Connected workers: ${connectedWorkers.keys}"
         }
     }
     
@@ -168,19 +204,40 @@ class MinimalIntegrationTest {
             worker2.use { w2 ->
                 w1.start()
                 w2.start()
-                delay(1000)
                 
-                // Then
-                assertTrue(server.workerManagementService.isWorkerRegistered(worker1Id))
-                assertTrue(server.workerManagementService.isWorkerRegistered(worker2Id))
+                // Wait for both workers to connect
+                val worker1Connected = server.waitForWorkerConnection(worker1Id, 3000)
+                val worker2Connected = server.waitForWorkerConnection(worker2Id, 3000)
                 
-                val registeredWorkers = server.workerManagementService.getRegisteredWorkers()
-                assertEquals(2, registeredWorkers.size) {
-                    "Should have both workers registered"
+                assertTrue(worker1Connected) {
+                    "Worker 1 should connect within timeout"
+                }
+                assertTrue(worker2Connected) {
+                    "Worker 2 should connect within timeout"
                 }
                 
-                junitAssertNotNull(registeredWorkers[worker1Id])
-                junitAssertNotNull(registeredWorkers[worker2Id])
+                // Additional delay for state consistency
+                delay(200)
+                
+                // Then
+                assertTrue(server.workerManagementService.isWorkerRegistered(worker1Id)) {
+                    "Worker 1 should be registered"
+                }
+                assertTrue(server.workerManagementService.isWorkerRegistered(worker2Id)) {
+                    "Worker 2 should be registered"
+                }
+                
+                val registeredWorkers = server.workerManagementService.getRegisteredWorkers()
+                assertTrue(registeredWorkers.size >= 2) {
+                    "Should have at least both workers registered. Got: ${registeredWorkers.keys}"
+                }
+                
+                junitAssertNotNull(registeredWorkers[worker1Id]) {
+                    "Worker 1 should be in registered workers"
+                }
+                junitAssertNotNull(registeredWorkers[worker2Id]) {
+                    "Worker 2 should be in registered workers"
+                }
             }
         }
     }

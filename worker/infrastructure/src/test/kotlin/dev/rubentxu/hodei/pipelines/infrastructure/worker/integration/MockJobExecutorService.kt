@@ -248,6 +248,22 @@ class MockJobExecutorService : JobExecutorServiceGrpcKt.JobExecutorServiceCorout
         }
         return false
     }
+    
+    fun forceDisconnectWorker(workerId: String) {
+        connectedWorkers.remove(workerId)
+        logger.info { "Mock server: Forced disconnect of worker $workerId" }
+    }
+    
+    fun waitForWorkerDisconnection(workerId: String, timeoutMs: Long = 3000): Boolean {
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < timeoutMs) {
+            if (!connectedWorkers.containsKey(workerId)) {
+                return true
+            }
+            Thread.sleep(10)
+        }
+        return false
+    }
 }
 
 /**
