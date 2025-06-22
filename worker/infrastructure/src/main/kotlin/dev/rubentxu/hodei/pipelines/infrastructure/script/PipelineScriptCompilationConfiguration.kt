@@ -1,5 +1,6 @@
 package dev.rubentxu.hodei.pipelines.infrastructure.script
 
+import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.PipelineContext
 import kotlin.script.experimental.api.ScriptCompilationConfiguration
 import kotlin.script.experimental.api.defaultImports
 import kotlin.script.experimental.api.implicitReceivers
@@ -12,9 +13,7 @@ object PipelineScriptCompilationConfiguration : ScriptCompilationConfiguration({
 
     // Define default imports available in the script
     defaultImports(
-        "dev.rubentxu.hodei.pipelines.infrastructure.script.PipelineContext",
-        "dev.rubentxu.hodei.pipelines.infrastructure.script.TaskContainer",
-        "dev.rubentxu.hodei.pipelines.infrastructure.script.PipelineTask"
+        "dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.PipelineContext",
     )
 
     // Configure JVM-specific options

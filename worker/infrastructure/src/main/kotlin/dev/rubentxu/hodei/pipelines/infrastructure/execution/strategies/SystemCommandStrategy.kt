@@ -4,8 +4,8 @@ import dev.rubentxu.hodei.pipelines.domain.job.Job
 import dev.rubentxu.hodei.pipelines.domain.job.JobPayload
 import dev.rubentxu.hodei.pipelines.domain.job.JobType
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
-import dev.rubentxu.hodei.pipelines.infrastructure.execution.JobExecutionResult
-import dev.rubentxu.hodei.pipelines.infrastructure.execution.JobExecutionStrategy
+import dev.rubentxu.hodei.pipelines.domain.worker.model.execution.JobExecutionResult
+import dev.rubentxu.hodei.pipelines.domain.worker.ports.JobExecutionStrategy
 import dev.rubentxu.hodei.pipelines.port.JobOutputChunk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

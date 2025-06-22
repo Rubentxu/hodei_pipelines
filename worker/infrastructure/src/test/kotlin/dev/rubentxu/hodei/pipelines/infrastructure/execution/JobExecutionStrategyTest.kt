@@ -2,6 +2,7 @@ package dev.rubentxu.hodei.pipelines.infrastructure.execution
 
 import dev.rubentxu.hodei.pipelines.domain.job.*
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
+import dev.rubentxu.hodei.pipelines.domain.worker.ports.ExecutionStrategyManager
 import dev.rubentxu.hodei.pipelines.infrastructure.execution.strategies.KotlinScriptingStrategy
 import dev.rubentxu.hodei.pipelines.infrastructure.execution.strategies.SystemCommandStrategy
 import dev.rubentxu.hodei.pipelines.port.JobOutputChunk

@@ -1,12 +1,18 @@
-package dev.rubentxu.hodei.pipelines.infrastructure.dsl
+package dev.rubentxu.hodei.pipelines.domain.worker.model.dsl
+
 
 import dev.rubentxu.hodei.pipelines.domain.job.JobId
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
-import dev.rubentxu.hodei.pipelines.infrastructure.security.PipelineSecurityManager
-import dev.rubentxu.hodei.pipelines.infrastructure.security.SecurityCheckResult
-import dev.rubentxu.hodei.pipelines.infrastructure.dsl.LibraryManager
-import dev.rubentxu.hodei.pipelines.infrastructure.dsl.LibraryReference
-import dev.rubentxu.hodei.pipelines.port.*
+import dev.rubentxu.hodei.pipelines.domain.worker.model.library.LibraryReference
+import dev.rubentxu.hodei.pipelines.domain.worker.ports.PipelineSecurityManager
+import dev.rubentxu.hodei.pipelines.domain.worker.model.security.SecurityCheckResult
+import dev.rubentxu.hodei.pipelines.port.JobExecutionEvent
+import dev.rubentxu.hodei.pipelines.port.JobOutputChunk
+import dev.rubentxu.hodei.pipelines.port.PipelineEvent
+import dev.rubentxu.hodei.pipelines.port.StageStatus
+import dev.rubentxu.hodei.pipelines.port.StageType
+
+
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.coroutineScope
@@ -20,7 +26,7 @@ private val logger = KotlinLogging.logger {}
 /**
  * Advanced Pipeline Context with enhanced DSL capabilities
  */
-class AdvancedPipelineContext(
+class PipelineContext(
     val jobId: JobId,
     val workerId: WorkerId,
     private val environment: Map<String, String>,
@@ -277,7 +283,7 @@ class AdvancedPipelineContext(
  */
 class StageContext(
     val name: String,
-    private val pipelineContext: AdvancedPipelineContext
+    private val pipelineContext: PipelineContext
 ) {
     suspend fun steps(block: suspend StepsContext.() -> Unit) {
         val stepsContext = StepsContext(pipelineContext)
@@ -297,7 +303,7 @@ class StageContext(
 }
 
 class StepsContext(
-    private val pipelineContext: AdvancedPipelineContext
+    private val pipelineContext: PipelineContext
 ) {
     suspend fun script(content: String) = pipelineContext.script(content)
     suspend fun sh(command: String) = pipelineContext.sh(command)
@@ -307,7 +313,7 @@ class StepsContext(
 }
 
 class ParallelContext(
-    private val pipelineContext: AdvancedPipelineContext
+    private val pipelineContext: PipelineContext
 ) {
     private val parallelStages = mutableListOf<Pair<String, suspend () -> Unit>>()
     
@@ -342,7 +348,7 @@ class ParametersContext(
 }
 
 class AgentContext(
-    private val pipelineContext: AdvancedPipelineContext
+    private val pipelineContext: PipelineContext
 ) {
     fun label(label: String) {
         // Agent labeling logic
@@ -351,7 +357,7 @@ class AgentContext(
 }
 
 class ToolsContext(
-    private val pipelineContext: AdvancedPipelineContext
+    private val pipelineContext: PipelineContext
 ) {
     suspend fun maven(version: String = "3.8.6", block: suspend () -> Unit) {
         pipelineContext.println("Using Maven $version")
@@ -370,7 +376,7 @@ class ToolsContext(
 }
 
 class DockerContext(
-    private val pipelineContext: AdvancedPipelineContext
+    private val pipelineContext: PipelineContext
 ) {
     suspend fun build(tag: String, dockerfile: String = "Dockerfile") {
         pipelineContext.sh("docker build -t $tag -f $dockerfile .")
@@ -386,7 +392,7 @@ class DockerContext(
 }
 
 class SCMContext(
-    private val pipelineContext: AdvancedPipelineContext
+    private val pipelineContext: PipelineContext
 ) {
     suspend fun checkout(url: String, branch: String = "main", credentials: String? = null) {
         val credentialsFlag = credentials?.let { "-c credential.helper= " } ?: ""

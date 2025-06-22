@@ -1,21 +1,13 @@
 package dev.rubentxu.hodei.pipelines.infrastructure.security
 
+import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.FileOperation
+import dev.rubentxu.hodei.pipelines.domain.worker.ports.PipelineSecurityManager
+import dev.rubentxu.hodei.pipelines.domain.worker.model.security.SecurityCheckResult
+import dev.rubentxu.hodei.pipelines.domain.worker.model.security.SecurityPolicy
+import dev.rubentxu.hodei.pipelines.domain.worker.model.security.SecurityViolation
 import mu.KotlinLogging
-import java.time.Duration
 
 private val logger = KotlinLogging.logger {}
-
-/**
- * Security manager for pipeline execution
- */
-interface PipelineSecurityManager {
-    fun checkScriptAccess(script: String): SecurityCheckResult
-    fun checkLibraryAccess(libraryId: String): SecurityCheckResult
-    fun checkFileAccess(path: String, operation: FileOperation): SecurityCheckResult
-    fun checkNetworkAccess(host: String, port: Int): SecurityCheckResult
-    fun checkSystemPropertyAccess(property: String): SecurityCheckResult
-    val securityPolicy: SecurityPolicy
-}
 
 /**
  * Default implementation of PipelineSecurityManager
@@ -227,103 +219,4 @@ class DefaultPipelineSecurityManager(
             Regex("com\\.sun\\.") to "Internal Sun classes"
         )
     }
-}
-
-/**
- * Security policy configuration
- */
-data class SecurityPolicy(
-    val allowSystemCalls: Boolean = false,
-    val allowFileSystemAccess: Boolean = true,
-    val allowFileRead: Boolean = true,
-    val allowFileWrite: Boolean = false,
-    val allowFileExecute: Boolean = false,
-    val allowNetworkAccess: Boolean = true,
-    val allowLocalhost: Boolean = false,
-    val allowRestrictedPorts: Boolean = false,
-    val allowReflection: Boolean = false,
-    val allowSystemProperties: Boolean = false,
-    val allowedLibraries: Set<String> = emptySet(),
-    val blockedLibraries: Set<String> = setOf(
-        "java.lang.Runtime",
-        "java.lang.ProcessBuilder",
-        "java.lang.reflect.*",
-        "sun.*",
-        "com.sun.*"
-    ),
-    val maxExecutionTime: Duration = Duration.ofMinutes(30),
-    val maxMemoryUsage: Long = 512 * 1024 * 1024, // 512MB
-    val maxScriptSize: Int = 100 * 1024, // 100KB
-    val sandboxEnabled: Boolean = true
-) {
-    companion object {
-        fun strict() = SecurityPolicy(
-            allowSystemCalls = false,
-            allowFileSystemAccess = false,
-            allowNetworkAccess = false,
-            allowReflection = false,
-            sandboxEnabled = true
-        )
-        
-        fun permissive() = SecurityPolicy(
-            allowSystemCalls = true,
-            allowFileSystemAccess = true,
-            allowFileWrite = true,
-            allowFileExecute = true,
-            allowNetworkAccess = true,
-            allowLocalhost = true,
-            allowRestrictedPorts = true,
-            allowReflection = true,
-            allowSystemProperties = true,
-            sandboxEnabled = false
-        )
-        
-        fun development() = SecurityPolicy(
-            allowSystemCalls = true,
-            allowFileSystemAccess = true,
-            allowFileRead = true,
-            allowFileWrite = true,
-            allowNetworkAccess = true,
-            allowLocalhost = true,
-            allowReflection = false,
-            sandboxEnabled = true
-        )
-    }
-}
-
-/**
- * Security check result
- */
-sealed class SecurityCheckResult {
-    object Allowed : SecurityCheckResult()
-    data class Denied(val violations: List<SecurityViolation>) : SecurityCheckResult()
-}
-
-/**
- * Security violations
- */
-sealed class SecurityViolation(val message: String) {
-    class DangerousPattern(val pattern: String, val description: String) : SecurityViolation("Dangerous pattern detected: $description ($pattern)")
-    class UnauthorizedSystemCall(message: String = "Unauthorized system call") : SecurityViolation(message)
-    class UnauthorizedFileAccess(message: String = "Unauthorized file access") : SecurityViolation(message)
-    class UnauthorizedNetworkAccess(message: String = "Unauthorized network access") : SecurityViolation(message)
-    class UnauthorizedReflection(message: String = "Unauthorized reflection usage") : SecurityViolation(message)
-    class UnauthorizedLibrary(message: String) : SecurityViolation(message)
-    class BlockedLibrary(message: String) : SecurityViolation(message)
-    class DangerousLibrary(message: String) : SecurityViolation(message)
-    class RestrictedPath(message: String) : SecurityViolation(message)
-    class RestrictedHost(message: String) : SecurityViolation(message)
-    class RestrictedPort(message: String) : SecurityViolation(message)
-    class RestrictedSystemProperty(message: String) : SecurityViolation(message)
-    class ScriptTooLarge(message: String) : SecurityViolation(message)
-}
-
-/**
- * File operations
- */
-enum class FileOperation {
-    READ,
-    WRITE,
-    DELETE,
-    EXECUTE
 }

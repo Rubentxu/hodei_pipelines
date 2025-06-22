@@ -1,5 +1,9 @@
 package dev.rubentxu.hodei.pipelines.infrastructure.security
 
+import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.FileOperation
+import dev.rubentxu.hodei.pipelines.domain.worker.ports.PipelineSecurityManager
+import dev.rubentxu.hodei.pipelines.domain.worker.model.security.SecurityCheckResult
+import dev.rubentxu.hodei.pipelines.domain.worker.model.security.SecurityPolicy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach

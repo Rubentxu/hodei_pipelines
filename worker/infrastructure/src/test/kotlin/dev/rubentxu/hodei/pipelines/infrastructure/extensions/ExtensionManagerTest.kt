@@ -1,5 +1,15 @@
 package dev.rubentxu.hodei.pipelines.infrastructure.extensions
 
+import dev.rubentxu.hodei.pipelines.application.worker.dsl.extensions.DefaultExtensionManager
+import dev.rubentxu.hodei.pipelines.application.worker.dsl.extensions.DockerExtension
+import dev.rubentxu.hodei.pipelines.application.worker.dsl.extensions.ExtensionBase
+import dev.rubentxu.hodei.pipelines.domain.worker.ports.ExtensionManager
+import dev.rubentxu.hodei.pipelines.application.worker.dsl.extensions.GitExtension
+import dev.rubentxu.hodei.pipelines.application.worker.dsl.extensions.NotificationExtension
+import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.ParameterDefinition
+import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.ParameterType
+import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.StepDefinition
+import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.StepResult
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach

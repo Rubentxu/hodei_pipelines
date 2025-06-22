@@ -1,17 +1,12 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    application
-}
-
-tasks.jar {
-    archiveBaseName.set("worker-application")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 dependencies {
     implementation(project(":core:domain"))
-    implementation(project(":core:application"))
-    implementation(project(":worker:domain"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlin.logging.jvm)
     implementation(libs.logback.classic)
     
