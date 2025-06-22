@@ -6,243 +6,123 @@ import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Port for Worker Orchestration - Abstract interface for different container orchestrators
+ * Port for Worker Orchestration - Hexagonal Architecture Port
+ * 
+ * This is the PRIMARY PORT (driving port) for worker orchestration operations.
+ * It defines the contract that any orchestrator implementation must fulfill.
+ * 
+ * Following Dependency Inversion Principle:
+ * - High-level modules (application layer) depend on this abstraction
+ * - Low-level modules (infrastructure layer) implement this abstraction
+ * 
  * Implementations could be: Kubernetes, Docker Swarm, AWS ECS, Azure Container Instances, etc.
  */
 interface WorkerOrchestrator {
     
     /**
      * Create a new worker based on template
-     * @param template The worker template to use
-     * @param poolId The pool this worker belongs to
-     * @return Result of worker creation
+     * 
+     * This operation should be idempotent and handle retries gracefully.
+     * Resource allocation and scheduling are orchestrator-specific concerns.
+     * 
+     * @param template The worker template containing all configuration
+     * @param poolId The pool this worker belongs to for organization
+     * @return Functional result avoiding exceptions for expected failures
      */
     suspend fun createWorker(template: WorkerTemplate, poolId: WorkerPoolId): WorkerCreationResult
     
     /**
-     * Delete/terminate a worker
+     * Delete/terminate a worker gracefully
+     * 
+     * Should attempt graceful shutdown first, then force termination if needed.
+     * Must handle cases where worker is already deleted or not found.
+     * 
      * @param workerId The worker to terminate
-     * @return Result of worker deletion
+     * @return Result indicating success or specific failure reasons
      */
     suspend fun deleteWorker(workerId: WorkerId): WorkerDeletionResult
     
     /**
-     * Get current status of a worker
+     * Get current status of a specific worker
+     * 
+     * Provides real-time status from the orchestration platform.
+     * Should include resource usage and health information.
+     * 
      * @param workerId The worker to check
-     * @return Current worker status
+     * @return Current worker status or failure reasons
      */
     suspend fun getWorkerStatus(workerId: WorkerId): WorkerStatusResult
     
     /**
-     * List all workers in a pool
+     * List all workers in a specific pool
+     * 
+     * Used for pool-specific operations and monitoring.
+     * Should return empty list rather than failure for non-existent pools.
+     * 
      * @param poolId The pool to list workers from
-     * @return List of workers in the pool
+     * @return List of workers in the pool (empty if pool doesn't exist)
      */
     suspend fun listWorkers(poolId: WorkerPoolId): List<Worker>
     
     /**
      * List all workers across all pools
-     * @return List of all workers
+     * 
+     * Used for global monitoring and resource management.
+     * May be expensive for large clusters - use with caution.
+     * 
+     * @return List of all workers managed by this orchestrator
      */
     suspend fun listAllWorkers(): List<Worker>
     
     /**
-     * Get resource availability in the orchestration platform
-     * @return Current resource availability
+     * Get current resource availability in the cluster
+     * 
+     * Critical for scheduling decisions and capacity planning.
+     * Should provide real-time resource information.
+     * 
+     * @return Current resource availability and constraints
      */
     suspend fun getResourceAvailability(): ResourceAvailability
     
     /**
-     * Stream worker lifecycle events
-     * @return Flow of worker events (created, started, stopped, failed, etc.)
+     * Stream worker lifecycle events in real-time
+     * 
+     * Provides observability into worker state changes.
+     * Used for monitoring, alerting, and reactive operations.
+     * 
+     * @return Flow of worker events (creation, status changes, deletion, etc.)
      */
     fun watchWorkerEvents(): Flow<WorkerOrchestrationEvent>
     
     /**
-     * Validate if a worker template is valid for this orchestrator
+     * Validate worker template before creation
+     * 
+     * Performs orchestrator-specific validation of template configuration.
+     * Should check resource limits, security policies, and platform constraints.
+     * 
      * @param template The template to validate
-     * @return Validation result
+     * @return Validation result with specific error details if invalid
      */
     suspend fun validateTemplate(template: WorkerTemplate): TemplateValidationResult
     
     /**
-     * Get orchestrator-specific information
+     * Get orchestrator implementation information
+     * 
+     * Provides metadata about capabilities, limits, and configuration.
+     * Used for feature detection and compatibility checks.
+     * 
      * @return Information about the orchestrator implementation
      */
     suspend fun getOrchestratorInfo(): OrchestratorInfo
     
     /**
-     * Health check for the orchestrator
-     * @return Health status of the orchestrator
+     * Health check for the orchestrator connection
+     * 
+     * Verifies that the orchestrator is reachable and functioning.
+     * Should perform lightweight connectivity and permission checks.
+     * 
+     * @return Health status with diagnostic information
      */
     suspend fun healthCheck(): OrchestratorHealth
 }
 
-/**
- * Result of worker creation
- */
-sealed class WorkerCreationResult {
-    data class Success(val worker: Worker) : WorkerCreationResult()
-    data class Failed(val error: String, val cause: Throwable? = null) : WorkerCreationResult()
-    data class InsufficientResources(val required: ResourceRequirements, val available: ResourceAvailability) : WorkerCreationResult()
-    data class InvalidTemplate(val errors: List<String>) : WorkerCreationResult()
-}
-
-/**
- * Result of worker deletion
- */
-sealed class WorkerDeletionResult {
-    object Success : WorkerDeletionResult()
-    data class Failed(val error: String, val cause: Throwable? = null) : WorkerDeletionResult()
-    data class NotFound(val workerId: WorkerId) : WorkerDeletionResult()
-}
-
-/**
- * Result of worker status check
- */
-sealed class WorkerStatusResult {
-    data class Success(val worker: Worker) : WorkerStatusResult()
-    data class NotFound(val workerId: WorkerId) : WorkerStatusResult()
-    data class Failed(val error: String, val cause: Throwable? = null) : WorkerStatusResult()
-}
-
-/**
- * Template validation result
- */
-sealed class TemplateValidationResult {
-    object Valid : TemplateValidationResult()
-    data class Invalid(val errors: List<String>) : TemplateValidationResult()
-}
-
-/**
- * Worker orchestration lifecycle events
- */
-sealed class WorkerOrchestrationEvent {
-    abstract val workerId: WorkerId
-    abstract val poolId: WorkerPoolId
-    abstract val timestamp: java.time.Instant
-    
-    data class WorkerCreated(
-        override val workerId: WorkerId,
-        override val poolId: WorkerPoolId,
-        val worker: Worker,
-        override val timestamp: java.time.Instant = java.time.Instant.now()
-    ) : WorkerOrchestrationEvent()
-    
-    data class WorkerStarted(
-        override val workerId: WorkerId,
-        override val poolId: WorkerPoolId,
-        override val timestamp: java.time.Instant = java.time.Instant.now()
-    ) : WorkerOrchestrationEvent()
-    
-    data class WorkerReady(
-        override val workerId: WorkerId,
-        override val poolId: WorkerPoolId,
-        override val timestamp: java.time.Instant = java.time.Instant.now()
-    ) : WorkerOrchestrationEvent()
-    
-    data class WorkerBusy(
-        override val workerId: WorkerId,
-        override val poolId: WorkerPoolId,
-        val jobId: String,
-        override val timestamp: java.time.Instant = java.time.Instant.now()
-    ) : WorkerOrchestrationEvent()
-    
-    data class WorkerStopped(
-        override val workerId: WorkerId,
-        override val poolId: WorkerPoolId,
-        val reason: String,
-        override val timestamp: java.time.Instant = java.time.Instant.now()
-    ) : WorkerOrchestrationEvent()
-    
-    data class WorkerFailed(
-        override val workerId: WorkerId,
-        override val poolId: WorkerPoolId,
-        val error: String,
-        val cause: Throwable? = null,
-        override val timestamp: java.time.Instant = java.time.Instant.now()
-    ) : WorkerOrchestrationEvent()
-    
-    data class WorkerDeleted(
-        override val workerId: WorkerId,
-        override val poolId: WorkerPoolId,
-        override val timestamp: java.time.Instant = java.time.Instant.now()
-    ) : WorkerOrchestrationEvent()
-}
-
-/**
- * Information about the orchestrator implementation
- */
-data class OrchestratorInfo(
-    val type: OrchestratorType,
-    val version: String,
-    val capabilities: Set<OrchestratorCapability>,
-    val limits: OrchestratorLimits,
-    val metadata: Map<String, String> = emptyMap()
-)
-
-/**
- * Type of orchestrator
- */
-enum class OrchestratorType {
-    KUBERNETES,
-    DOCKER_SWARM,
-    AWS_ECS,
-    AWS_FARGATE,
-    AZURE_CONTAINER_INSTANCES,
-    GOOGLE_CLOUD_RUN,
-    NOMAD,
-    MESOS,
-    LOCAL_DOCKER,
-    PROCESS_BASED // For testing/development
-}
-
-/**
- * Capabilities supported by the orchestrator
- */
-enum class OrchestratorCapability {
-    AUTO_SCALING,
-    PERSISTENT_STORAGE,
-    LOAD_BALANCING,
-    SERVICE_DISCOVERY,
-    SECRETS_MANAGEMENT,
-    NETWORK_POLICIES,
-    RESOURCE_QUOTAS,
-    NODE_AFFINITY,
-    TOLERATIONS,
-    VOLUME_MOUNTS,
-    SECURITY_CONTEXTS,
-    HEALTH_CHECKS,
-    ROLLING_UPDATES,
-    BATCH_JOBS
-}
-
-/**
- * Limits imposed by the orchestrator
- */
-data class OrchestratorLimits(
-    val maxWorkersPerPool: Int? = null,
-    val maxTotalWorkers: Int? = null,
-    val maxCpuPerWorker: String? = null,
-    val maxMemoryPerWorker: String? = null,
-    val maxVolumesPerWorker: Int? = null,
-    val supportedVolumeTypes: Set<String> = emptySet(),
-    val maxConcurrentCreations: Int? = null
-)
-
-/**
- * Health status of the orchestrator
- */
-data class OrchestratorHealth(
-    val status: HealthStatus,
-    val message: String? = null,
-    val details: Map<String, Any> = emptyMap(),
-    val lastChecked: java.time.Instant = java.time.Instant.now()
-)
-
-enum class HealthStatus {
-    HEALTHY,
-    DEGRADED,
-    UNHEALTHY,
-    UNKNOWN
-}

@@ -180,37 +180,52 @@ class JobQueue(
     }
     
     private fun canWorkerExecuteJob(worker: Worker, queuedJob: QueuedJob): Boolean {
-        // Check if worker has required capabilities
-        val hasCapabilities = queuedJob.requirements.capabilities.all { (key, value) ->
-            when (key) {
-                "test" -> worker.capabilities.hasLabel("test") && value == "true"
-                "os" -> worker.capabilities.getOperatingSystem() == value
-                "arch" -> worker.capabilities.getArchitecture() == value
-                else -> worker.capabilities.toMap()[key] == value
-            }
+        // Check if worker has required languages
+        val hasLanguages = queuedJob.requirements.requiredLanguages.all { language ->
+            worker.capabilities.languages.contains(language)
+        }
+        
+        // Check if worker has required tools
+        val hasTools = queuedJob.requirements.requiredTools.all { tool ->
+            worker.capabilities.tools.contains(tool)
+        }
+        
+        // Check if worker has required features
+        val hasFeatures = queuedJob.requirements.requiredFeatures.all { feature ->
+            worker.capabilities.features.contains(feature)
         }
         
         // Check if worker meets resource requirements (simplified)
         val hasResources = true // Assume worker can handle the resources for now
         
-        return hasCapabilities && hasResources && worker.status == dev.rubentxu.hodei.pipelines.domain.worker.WorkerStatus.READY
+        return hasLanguages && hasTools && hasFeatures && hasResources && 
+               worker.status == dev.rubentxu.hodei.pipelines.domain.worker.WorkerStatus.READY
     }
     
     private fun calculateResourceMatch(worker: Worker, queuedJob: QueuedJob): Double {
         // Calculate how well worker capabilities match job requirements
-        val capabilityMatches = queuedJob.requirements.capabilities.count { (key, value) ->
-            when (key) {
-                "test" -> worker.capabilities.hasLabel("test") && value == "true"
-                "os" -> worker.capabilities.getOperatingSystem() == value
-                "arch" -> worker.capabilities.getArchitecture() == value
-                else -> worker.capabilities.toMap()[key] == value
-            }
+        val totalRequirements = queuedJob.requirements.requiredLanguages.size +
+                              queuedJob.requirements.requiredTools.size +
+                              queuedJob.requirements.requiredFeatures.size
+        
+        if (totalRequirements == 0) return 1.0
+        
+        val languageMatches = queuedJob.requirements.requiredLanguages.count { language ->
+            worker.capabilities.languages.contains(language)
         }
         
-        val totalRequirements = queuedJob.requirements.capabilities.size
+        val toolMatches = queuedJob.requirements.requiredTools.count { tool ->
+            worker.capabilities.tools.contains(tool)
+        }
+        
+        val featureMatches = queuedJob.requirements.requiredFeatures.count { feature ->
+            worker.capabilities.features.contains(feature)
+        }
+        
+        val totalMatches = languageMatches + toolMatches + featureMatches
         
         return if (totalRequirements > 0) {
-            capabilityMatches.toDouble() / totalRequirements
+            totalMatches.toDouble() / totalRequirements
         } else {
             1.0
         }

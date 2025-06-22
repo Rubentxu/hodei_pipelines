@@ -21,15 +21,27 @@ data class WorkerTemplate(
     val description: String = "",
     val image: String,
     val resources: ResourceRequirements,
-    val capabilities: Map<String, String> = emptyMap(),
+    val capabilities: WorkerTemplateCapabilities = WorkerTemplateCapabilities(),
     val labels: Map<String, String> = emptyMap(),
-    val environment: Map<String, String> = emptyMap(),
+    val env: Map<String, String> = emptyMap(),
     val nodeSelector: Map<String, String> = emptyMap(),
-    val tolerations: List<Toleration> = emptyList(),
-    val affinity: NodeAffinity? = null,
-    val serviceAccount: String? = null,
-    val securityContext: SecurityContext? = null,
-    val volumes: List<VolumeMount> = emptyList(),
+    val tolerations: List<WorkerToleration> = emptyList(),
+    val affinity: WorkerAffinity? = null,
+    val serviceAccountName: String? = null,
+    val securityContext: PodSecurityContext? = null,
+    val containerSecurityContext: ContainerSecurityContext? = null,
+    val volumes: List<VolumeSpec> = emptyList(),
+    val volumeMounts: List<VolumeMountSpec> = emptyList(),
+    val ports: List<ContainerPort> = emptyList(),
+    val command: List<String> = emptyList(),
+    val args: List<String> = emptyList(),
+    val imagePullPolicy: String? = null,
+    val initContainers: List<InitContainer> = emptyList(),
+    val dnsPolicy: String? = null,
+    val hostname: String? = null,
+    val priorityClassName: String? = null,
+    val livenessProbe: ProbeSpec? = null,
+    val readinessProbe: ProbeSpec? = null,
     val createdAt: Instant = Instant.now(),
     val version: String = "1.0.0"
 ) {
@@ -39,8 +51,16 @@ data class WorkerTemplate(
      */
     fun matches(requirements: WorkerRequirements): Boolean {
         // Check if template has all required capabilities
-        val hasRequiredCapabilities = requirements.capabilities.all { (key, value) ->
-            capabilities[key] == value
+        val hasRequiredLanguages = requirements.requiredLanguages.all { language ->
+            capabilities.languages.contains(language)
+        }
+        
+        val hasRequiredTools = requirements.requiredTools.all { tool ->
+            capabilities.tools.contains(tool)
+        }
+        
+        val hasRequiredFeatures = requirements.requiredFeatures.all { feature ->
+            capabilities.features.contains(feature)
         }
         
         // Check if template has required labels
@@ -51,7 +71,8 @@ data class WorkerTemplate(
         // Check resource requirements
         val hasResourcesAvailable = resources.canSatisfy(requirements.resources)
         
-        return hasRequiredCapabilities && hasRequiredLabels && hasResourcesAvailable
+        return hasRequiredLanguages && hasRequiredTools && hasRequiredFeatures && 
+               hasRequiredLabels && hasResourcesAvailable
     }
     
     /**
@@ -67,7 +88,7 @@ data class WorkerTemplate(
         additionalLabels: Map<String, String> = emptyMap(),
         resourceOverrides: ResourceRequirements? = null
     ): WorkerTemplate = copy(
-        environment = environment + additionalEnv,
+        env = env + additionalEnv,
         labels = labels + additionalLabels,
         resources = resourceOverrides ?: resources
     )
@@ -79,7 +100,7 @@ data class WorkerTemplate(
 data class ResourceRequirements(
     val cpu: String = "500m",           // CPU in millicores (e.g., "1000m" = 1 CPU)
     val memory: String = "1Gi",         // Memory (e.g., "2Gi", "512Mi")
-    val storage: String? = null,        // Storage (e.g., "10Gi")
+    val storage: String = "",           // Storage (e.g., "10Gi")
     val gpu: Int = 0,                   // Number of GPUs
     val limits: ResourceLimits? = null  // Resource limits (if different from requests)
 ) {
@@ -130,11 +151,13 @@ data class ResourceLimits(
  * Worker Requirements when scheduling jobs
  */
 data class WorkerRequirements(
-    val capabilities: Map<String, String> = emptyMap(),
+    val requiredLanguages: Set<String> = emptySet(),
+    val requiredTools: Set<String> = emptySet(),
+    val requiredFeatures: Set<String> = emptySet(),
     val labels: Map<String, String> = emptyMap(),
     val resources: ResourceRequirements = ResourceRequirements(),
     val nodeSelector: Map<String, String> = emptyMap(),
-    val tolerations: List<Toleration> = emptyList()
+    val tolerations: List<WorkerToleration> = emptyList()
 )
 
 /**
@@ -232,4 +255,146 @@ data class KeyToPath(
     val key: String,
     val path: String,
     val mode: Int? = null
+)
+
+/**
+ * Extended classes for Kubernetes WorkerTemplate support
+ */
+
+/**
+ * Worker template capabilities (languages, tools, features)
+ */
+data class WorkerTemplateCapabilities(
+    val languages: Set<String> = emptySet(),
+    val tools: Set<String> = emptySet(),
+    val features: Set<String> = emptySet()
+)
+
+/**
+ * Kubernetes Toleration (renamed from Toleration to avoid conflict)
+ */
+data class WorkerToleration(
+    val key: String,
+    val operator: String = "Equal",
+    val value: String? = null,
+    val effect: String? = null,
+    val tolerationSeconds: Long? = null
+)
+
+/**
+ * Worker Affinity (renamed from NodeAffinity)
+ */
+data class WorkerAffinity(
+    val nodeAffinity: WorkerNodeAffinity? = null
+)
+
+data class WorkerNodeAffinity(
+    val required: WorkerNodeSelector? = null,
+    val preferred: List<WorkerPreferredSchedulingTerm> = emptyList()
+)
+
+data class WorkerNodeSelector(
+    val terms: List<WorkerNodeSelectorTerm>
+)
+
+data class WorkerNodeSelectorTerm(
+    val matchExpressions: List<WorkerNodeSelectorRequirement> = emptyList()
+)
+
+data class WorkerNodeSelectorRequirement(
+    val key: String,
+    val operator: String,
+    val values: List<String> = emptyList()
+)
+
+data class WorkerPreferredSchedulingTerm(
+    val weight: Int,
+    val preference: WorkerNodeSelectorTerm
+)
+
+/**
+ * Pod Security Context
+ */
+data class PodSecurityContext(
+    val runAsUser: Long? = null,
+    val runAsGroup: Long? = null,
+    val runAsNonRoot: Boolean? = null,
+    val fsGroup: Long? = null
+)
+
+/**
+ * Container Security Context
+ */
+data class ContainerSecurityContext(
+    val runAsUser: Long? = null,
+    val runAsGroup: Long? = null,
+    val runAsNonRoot: Boolean? = null,
+    val readOnlyRootFilesystem: Boolean? = null,
+    val allowPrivilegeEscalation: Boolean? = null,
+    val capabilities: ContainerCapabilities? = null
+)
+
+data class ContainerCapabilities(
+    val add: List<String> = emptyList(),
+    val drop: List<String> = emptyList()
+)
+
+/**
+ * Volume Specification
+ */
+data class VolumeSpec(
+    val name: String,
+    val type: String, // emptyDir, configMap, secret, persistentVolumeClaim, hostPath
+    val source: String, // source identifier (configmap name, secret name, pvc name, host path)
+    val sizeLimit: String? = null,
+    val defaultMode: Int? = null,
+    val readOnly: Boolean? = null,
+    val hostPathType: String? = null
+)
+
+/**
+ * Volume Mount Specification
+ */
+data class VolumeMountSpec(
+    val name: String,
+    val mountPath: String,
+    val readOnly: Boolean = false,
+    val subPath: String? = null
+)
+
+/**
+ * Container Port
+ */
+data class ContainerPort(
+    val name: String? = null,
+    val containerPort: Int,
+    val protocol: String? = null
+)
+
+/**
+ * Init Container
+ */
+data class InitContainer(
+    val name: String,
+    val image: String,
+    val command: List<String> = emptyList(),
+    val args: List<String> = emptyList(),
+    val env: Map<String, String> = emptyMap()
+)
+
+/**
+ * Probe Specification (for liveness and readiness probes)
+ */
+data class ProbeSpec(
+    val type: String, // http, tcp, exec
+    val path: String? = null,
+    val port: Int = 8080,
+    val scheme: String? = null,
+    val headers: Map<String, String>? = null,
+    val command: List<String>? = null,
+    val initialDelaySeconds: Int = 0,
+    val periodSeconds: Int = 10,
+    val timeoutSeconds: Int = 1,
+    val failureThreshold: Int = 3,
+    val successThreshold: Int = 1
 )

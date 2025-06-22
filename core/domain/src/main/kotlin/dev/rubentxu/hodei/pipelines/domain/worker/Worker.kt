@@ -54,6 +54,11 @@ data class WorkerCapabilities(
     fun getOperatingSystem(): String? = capabilities["os"]
     fun getArchitecture(): String? = capabilities["arch"]
     fun getLabels(): List<String> = capabilities["labels"]?.split(",") ?: emptyList()
+    
+    // New capabilities support
+    val languages: Set<String> get() = capabilities["languages"]?.split(",")?.toSet() ?: emptySet()
+    val tools: Set<String> get() = capabilities["tools"]?.split(",")?.toSet() ?: emptySet()
+    val features: Set<String> get() = capabilities["features"]?.split(",")?.toSet() ?: emptySet()
 
     fun toMap(): Map<String, String> {
         return capabilities
@@ -89,10 +94,24 @@ class CapabilitiesBuilder {
         capabilities["maxConcurrentJobs"] = maxJobs.toString()
         return this
     }
+    
+    fun languages(languages: Set<String>): CapabilitiesBuilder {
+        capabilities["languages"] = languages.joinToString(",")
+        return this
+    }
+    
+    fun tools(tools: Set<String>): CapabilitiesBuilder {
+        capabilities["tools"] = tools.joinToString(",")
+        return this
+    }
+    
+    fun features(features: Set<String>): CapabilitiesBuilder {
+        capabilities["features"] = features.joinToString(",")
+        return this
+    }
 
     fun build(): WorkerCapabilities {
         return WorkerCapabilities(capabilities)
-
     }
 }
 

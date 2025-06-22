@@ -321,20 +321,35 @@ class OrchestrationCoordinator(
         return availableWorkers
             .filter { worker ->
                 // Check basic capability requirements
-                queuedJob.requirements.capabilities.all { (key, value) ->
-                    when (key) {
-                        "build" -> worker.capabilities.hasLabel("build") && value == "true"
-                        "test" -> worker.capabilities.hasLabel("test") && value == "true"
-                        "deploy" -> worker.capabilities.hasLabel("deploy") && value == "true"
-                        else -> worker.capabilities.toMap()[key] == value
-                    }
+                val hasLanguages = queuedJob.requirements.requiredLanguages.all { language ->
+                    worker.capabilities.languages.contains(language)
                 }
+                
+                val hasTools = queuedJob.requirements.requiredTools.all { tool ->
+                    worker.capabilities.tools.contains(tool)
+                }
+                
+                val hasFeatures = queuedJob.requirements.requiredFeatures.all { feature ->
+                    worker.capabilities.features.contains(feature)
+                }
+                
+                hasLanguages && hasTools && hasFeatures
             }
             .maxByOrNull { worker ->
                 // Simple scoring: prefer workers with exact capability matches
-                val capabilityScore = queuedJob.requirements.capabilities.count { (key, value) ->
-                    worker.capabilities.toMap()[key] == value
-                } * 10
+                val languageMatches = queuedJob.requirements.requiredLanguages.count { language ->
+                    worker.capabilities.languages.contains(language)
+                }
+                
+                val toolMatches = queuedJob.requirements.requiredTools.count { tool ->
+                    worker.capabilities.tools.contains(tool)
+                }
+                
+                val featureMatches = queuedJob.requirements.requiredFeatures.count { feature ->
+                    worker.capabilities.features.contains(feature)
+                }
+                
+                val capabilityScore = (languageMatches + toolMatches + featureMatches) * 10
                 
                 // Add small randomness to distribute load
                 capabilityScore + (Math.random() * 5).toInt()

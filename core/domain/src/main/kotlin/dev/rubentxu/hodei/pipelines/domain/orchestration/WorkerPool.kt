@@ -5,16 +5,6 @@ import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
 import java.time.Instant
 
 /**
- * Worker Pool ID
- */
-@JvmInline
-value class WorkerPoolId(val value: String) {
-    init {
-        require(value.isNotBlank()) { "WorkerPoolId cannot be blank" }
-    }
-}
-
-/**
  * Worker Pool - Manages a group of workers with shared characteristics
  */
 data class WorkerPool(

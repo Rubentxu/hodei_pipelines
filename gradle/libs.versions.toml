@@ -18,7 +18,7 @@ grpcKotlin = "1.4.3"
 protobuf = "4.31.1"
 protobufPlugin = "0.9.5"
 osdetector = "1.7.3"
-kubernetesClient = "20.0.0"
+kubernetesClient = "24.0.0"
 mockito = "5.8.0"
 mockitoKotlin = "5.2.1"
 
