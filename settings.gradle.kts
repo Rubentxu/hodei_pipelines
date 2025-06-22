@@ -6,6 +6,8 @@ include(
     ":core:infrastructure",
     ":backend:application",
     ":backend:infrastructure",
+    ":worker:app",
+    ":worker:domain",
     ":worker:application",
     ":worker:infrastructure"
 )
