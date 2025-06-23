@@ -1,0 +1,249 @@
+package dev.rubentxu.hodei.pipelines.dsl.orchestration
+
+import dev.rubentxu.hodei.pipelines.dsl.execution.StepExecutor
+import dev.rubentxu.hodei.pipelines.dsl.model.*
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.*
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/**
+ * Tests para el orquestador principal que reemplaza los managers worker complejos.
+ */
+class PipelineOrchestratorTest {
+
+    private val orchestrator = PipelineOrchestrator.createDefault()
+
+    @Test
+    fun `should initialize with default configuration`() {
+        // Given/When - Orchestrator creado en setup
+
+        // Then
+        val systemInfo = orchestrator.getSystemInfo()
+        assertEquals("1.0.0", systemInfo["orchestratorVersion"])
+        assertEquals("ready", systemInfo["engineStatus"])
+        assertEquals("ready", systemInfo["compilerStatus"])
+        
+        val supportedSteps = systemInfo["supportedStepTypes"] as List<*>
+        assertTrue(supportedSteps.contains("sh"))
+        assertTrue(supportedSteps.contains("echo"))
+        assertTrue(supportedSteps.contains("docker"))
+    }
+
+    @Test
+    fun `should compile script to pipeline DSL`() = runTest {
+        // Given
+        val script = """
+            println("Test script compilation")
+            val result = "compiled"
+        """.trimIndent()
+
+        // When
+        val pipeline = orchestrator.compileScript(script)
+
+        // Then
+        assertNotNull(pipeline)
+        assertEquals("Compiled Pipeline", pipeline.name)
+        assertTrue(pipeline.stages.isNotEmpty())
+        assertTrue(pipeline.stages[0].steps.isNotEmpty())
+    }
+
+    @Test
+    fun `should provide access to runner and engine`() {
+        // Given/When
+        val runner = orchestrator.getRunner()
+        val engine = orchestrator.getEngine()
+
+        // Then
+        assertNotNull(runner, "Should provide pipeline runner")
+        assertNotNull(engine, "Should provide pipeline engine")
+        
+        // Verify runner can handle job types
+        assertTrue(runner.canHandle(dev.rubentxu.hodei.pipelines.domain.job.JobType.SCRIPT))
+        assertTrue(runner.canHandle(dev.rubentxu.hodei.pipelines.domain.job.JobType.COMMAND))
+    }
+
+    @Test
+    fun `should support custom step executor registration`() {
+        // Given
+        val customExecutor = object : StepExecutor {
+            override suspend fun execute(
+                step: dev.rubentxu.hodei.pipelines.dsl.model.Step, 
+                context: dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.PipelineContext
+            ) {
+                context.println("Custom step executed")
+            }
+        }
+
+        // When
+        orchestrator.registerStepExecutor("customStep", customExecutor)
+
+        // Then
+        val supportedSteps = orchestrator.getAvailableStepTypes()
+        assertTrue(supportedSteps.contains("customStep"), "Should support registered custom step")
+    }
+
+    @Test
+    fun `should validate pipeline structure`() {
+        // Given - Pipeline válido
+        val validPipeline = Pipeline(
+            name = "Valid Pipeline",
+            description = "A properly structured pipeline",
+            stages = listOf(
+                Stage(
+                    name = "Valid Stage",
+                    steps = listOf(
+                        Step.Echo(message = "Valid step")
+                    )
+                )
+            )
+        )
+
+        // When
+        val validationIssues = orchestrator.validatePipeline(validPipeline)
+
+        // Then
+        assertTrue(validationIssues.isEmpty(), "Valid pipeline should have no issues")
+    }
+
+    @Test
+    fun `should detect pipeline validation issues`() {
+        // Given - Pipeline inválido
+        val invalidPipeline = Pipeline(
+            name = "", // Nombre vacío
+            stages = listOf(
+                Stage(
+                    name = "", // Nombre de stage vacío
+                    steps = emptyList() // Sin steps
+                )
+            )
+        )
+
+        // When
+        val validationIssues = orchestrator.validatePipeline(invalidPipeline)
+
+        // Then
+        assertTrue(validationIssues.isNotEmpty(), "Invalid pipeline should have issues")
+        assertTrue(validationIssues.any { it.contains("Pipeline name cannot be blank") })
+        assertTrue(validationIssues.any { it.contains("Stage name cannot be blank") })
+        assertTrue(validationIssues.any { it.contains("must have steps") })
+    }
+
+    @Test
+    fun `should validate stage with parallel stages`() {
+        // Given - Pipeline con stages paralelos
+        val pipelineWithParallel = Pipeline(
+            name = "Parallel Pipeline",
+            stages = listOf(
+                Stage(
+                    name = "Parallel Stage",
+                    steps = emptyList(),
+                    parallel = ParallelStages(
+                        stages = listOf(
+                            Stage(
+                                name = "Parallel Sub-stage 1",
+                                steps = listOf(Step.Echo(message = "Parallel 1"))
+                            ),
+                            Stage(
+                                name = "Parallel Sub-stage 2", 
+                                steps = listOf(Step.Echo(message = "Parallel 2"))
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        // When
+        val validationIssues = orchestrator.validatePipeline(pipelineWithParallel)
+
+        // Then
+        assertTrue(validationIssues.isEmpty(), "Pipeline with parallel stages should be valid")
+    }
+
+    @Test
+    fun `should provide comprehensive system information`() {
+        // Given/When
+        val systemInfo = orchestrator.getSystemInfo()
+
+        // Then
+        assertTrue(systemInfo.containsKey("orchestratorVersion"))
+        assertTrue(systemInfo.containsKey("supportedStepTypes"))
+        assertTrue(systemInfo.containsKey("engineStatus"))
+        assertTrue(systemInfo.containsKey("compilerStatus"))
+        
+        val stepTypes = systemInfo["supportedStepTypes"] as List<*>
+        
+        // Verificar tipos de step core
+        assertTrue(stepTypes.contains("sh"), "Should support shell steps")
+        assertTrue(stepTypes.contains("bat"), "Should support batch steps")
+        assertTrue(stepTypes.contains("echo"), "Should support echo steps")
+        assertTrue(stepTypes.contains("docker"), "Should support docker steps")
+        assertTrue(stepTypes.contains("archiveArtifacts"), "Should support artifact archiving")
+        assertTrue(stepTypes.contains("publishTestResults"), "Should support test result publishing")
+        assertTrue(stepTypes.contains("checkout"), "Should support SCM checkout")
+        assertTrue(stepTypes.contains("notification"), "Should support notifications")
+        assertTrue(stepTypes.contains("dir"), "Should support directory operations")
+        assertTrue(stepTypes.contains("withEnv"), "Should support environment variables")
+    }
+
+    @Test
+    fun `should support custom orchestrator creation`() {
+        // Given
+        val customStepManager = dev.rubentxu.hodei.pipelines.dsl.execution.PipelineStepExecutorManager()
+        val customCompiler = dev.rubentxu.hodei.pipelines.dsl.script.PipelineScriptCompiler()
+
+        // When
+        val customOrchestrator = PipelineOrchestrator.createCustom(customStepManager, customCompiler)
+
+        // Then
+        assertNotNull(customOrchestrator)
+        
+        val systemInfo = customOrchestrator.getSystemInfo()
+        assertEquals("1.0.0", systemInfo["orchestratorVersion"])
+        assertTrue(systemInfo.containsKey("supportedStepTypes"))
+    }
+
+    @Test
+    fun `should handle empty pipeline gracefully`() {
+        // Given - Pipeline vacío
+        val emptyPipeline = Pipeline(
+            name = "Empty Pipeline",
+            stages = emptyList()
+        )
+
+        // When
+        val validationIssues = orchestrator.validatePipeline(emptyPipeline)
+
+        // Then
+        assertTrue(validationIssues.isNotEmpty())
+        assertTrue(validationIssues.any { it.contains("must have at least one stage") })
+    }
+
+    @Test
+    fun `should demonstrate replacement of complex worker managers`() {
+        // Given - Orchestrator simple que reemplaza múltiples managers
+
+        // When
+        val systemInfo = orchestrator.getSystemInfo()
+        val availableSteps = orchestrator.getAvailableStepTypes()
+
+        // Then - Verificar que proporciona toda la funcionalidad antes distribuida
+        
+        // Funcionalidad que antes estaba en DefaultExecutionStrategyManager
+        assertNotNull(orchestrator.getRunner())
+        assertTrue(orchestrator.getRunner().canHandle(dev.rubentxu.hodei.pipelines.domain.job.JobType.SCRIPT))
+        
+        // Funcionalidad que antes estaba en DefaultExtensionManager
+        assertTrue(availableSteps.contains("docker"))
+        assertTrue(availableSteps.contains("notification"))
+        
+        // Funcionalidad que antes estaba en PipelineScriptCompiler
+        assertTrue(systemInfo["compilerStatus"] == "ready")
+        
+        // Todo en una sola clase simplificada
+        assertEquals("ready", systemInfo["engineStatus"])
+        assertEquals("ready", systemInfo["compilerStatus"])
+    }
+}

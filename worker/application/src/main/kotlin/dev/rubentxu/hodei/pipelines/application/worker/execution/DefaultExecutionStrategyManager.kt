@@ -1,4 +1,4 @@
-package dev.rubentxu.hodei.pipelines.infrastructure.execution
+package dev.rubentxu.hodei.pipelines.application.worker.execution
 
 import dev.rubentxu.hodei.pipelines.domain.job.JobType
 import dev.rubentxu.hodei.pipelines.domain.worker.ports.ExecutionStrategyManager

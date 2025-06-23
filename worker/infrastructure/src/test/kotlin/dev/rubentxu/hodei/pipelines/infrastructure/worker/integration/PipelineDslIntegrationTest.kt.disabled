@@ -1,0 +1,332 @@
+package dev.rubentxu.hodei.pipelines.infrastructure.worker.integration
+
+import dev.rubentxu.hodei.pipelines.domain.job.*
+import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
+import dev.rubentxu.hodei.pipelines.dsl.integration.PipelineDslStrategy
+import dev.rubentxu.hodei.pipelines.port.JobExecutionEvent
+import dev.rubentxu.hodei.pipelines.port.JobOutputChunk
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.*
+import org.junit.jupiter.api.Assertions.*
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/**
+ * Tests de integración que verifican que Pipeline DSL puede reemplazar completamente
+ * el sistema worker antiguo manteniendo el patrón BasicIntegrationTest.
+ */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class PipelineDslIntegrationTest {
+
+    private lateinit var server: EmbeddedGrpcServer
+    private lateinit var pipelineDslStrategy: PipelineDslStrategy
+
+    @BeforeAll
+    fun setupServer() {
+        server = EmbeddedGrpcServer().start()
+        pipelineDslStrategy = PipelineDslStrategy()
+    }
+
+    @AfterAll
+    fun teardownServer() {
+        server.close()
+    }
+
+    @BeforeEach
+    fun clearTestData() {
+        server.clearTestData()
+    }
+
+    @Test
+    fun `server should be running for Pipeline DSL tests`() {
+        // Given/When - Server started in setup
+
+        // Then
+        assertTrue(server.isRunning()) {
+            "Server should be running for Pipeline DSL integration tests"
+        }
+        assertTrue(server.port > 0) {
+            "Server should have a valid port"
+        }
+    }
+
+    @Test
+    fun `Pipeline DSL should replace KotlinScriptingStrategy successfully`() = runTest {
+        // Given - Job que antes se ejecutaba con KotlinScriptingStrategy
+        val scriptJob = Job(
+            id = JobId("pipeline-dsl-script-test"),
+            definition = JobDefinition(
+                payload = JobPayload.Script("""
+                    println("Testing Pipeline DSL replacement for KotlinScriptingStrategy")
+                    val result = "success"
+                    println("Result: ${'$'}result")
+                """.trimIndent()),
+                environment = mapOf("SCRIPT_ENV" to "test_value")
+            )
+        )
+        val workerId = WorkerId("pipeline-dsl-worker")
+        val outputChunks = mutableListOf<JobOutputChunk>()
+
+        // When - Ejecutar con Pipeline DSL en lugar de KotlinScriptingStrategy
+        val result = pipelineDslStrategy.execute(scriptJob, workerId) { chunk ->
+            outputChunks.add(chunk)
+        }
+
+        // Then - Verificar que funciona igual o mejor
+        assertEquals(JobStatus.COMPLETED, result.status)
+        assertEquals(0, result.exitCode)
+        assertNotNull(result.output)
+        assertTrue(outputChunks.isNotEmpty(), "Should capture script output")
+        
+        // Verificar métricas mejoradas
+        assertNotNull(result.metrics)
+        assertTrue(result.metrics!!.containsKey("executionTimeMs"))
+        assertTrue(result.metrics!!.containsKey("stagesExecuted"))
+    }
+
+    @Test
+    fun `Pipeline DSL should replace SystemCommandStrategy successfully`() = runTest {
+        // Given - Job que antes se ejecutaba con SystemCommandStrategy
+        val commandJob = Job(
+            id = JobId("pipeline-dsl-command-test"),
+            definition = JobDefinition(
+                payload = JobPayload.Command(listOf("echo", "Testing Pipeline DSL command replacement")),
+                environment = mapOf("COMMAND_ENV" to "test_value")
+            )
+        )
+        val workerId = WorkerId("pipeline-dsl-worker")
+        val outputChunks = mutableListOf<JobOutputChunk>()
+
+        // When - Ejecutar con Pipeline DSL en lugar de SystemCommandStrategy
+        val result = pipelineDslStrategy.execute(commandJob, workerId) { chunk ->
+            outputChunks.add(chunk)
+        }
+
+        // Then - Verificar compatibilidad total
+        assertEquals(JobStatus.COMPLETED, result.status)
+        assertEquals(0, result.exitCode)
+        assertTrue(outputChunks.isNotEmpty())
+        
+        // Verificar que el output contiene lo esperado
+        val allOutput = outputChunks.joinToString("") { String(it.data) }
+        assertTrue(allOutput.contains("Testing Pipeline DSL command replacement"))
+    }
+
+    @Test
+    fun `Pipeline DSL should replace CompilerEmbeddableStrategy successfully`() = runTest {
+        // Given - Job que antes se ejecutaba con CompilerEmbeddableStrategy
+        val compiledJob = Job(
+            id = JobId("pipeline-dsl-compiled-test"),
+            definition = JobDefinition(
+                payload = JobPayload.CompiledScript(
+                    content = """
+                        println("Testing Pipeline DSL replacement for CompilerEmbeddableStrategy")
+                        val libraries = listOf("kotlin-stdlib")
+                        println("Libraries available: ${'$'}libraries")
+                    """.trimIndent(),
+                    libraries = listOf("kotlin-stdlib-jdk8")
+                ),
+                environment = mapOf("COMPILED_ENV" to "test_value")
+            )
+        )
+        val workerId = WorkerId("pipeline-dsl-worker")
+        val outputChunks = mutableListOf<JobOutputChunk>()
+
+        // When - Ejecutar con Pipeline DSL en lugar de CompilerEmbeddableStrategy
+        val result = pipelineDslStrategy.execute(compiledJob, workerId) { chunk ->
+            outputChunks.add(chunk)
+        }
+
+        // Then - Verificar funcionalidad equivalente
+        assertEquals(JobStatus.COMPLETED, result.status)
+        assertEquals(0, result.exitCode)
+        assertTrue(outputChunks.isNotEmpty())
+    }
+
+    @Test
+    fun `Pipeline DSL should maintain 100% success rate like BasicIntegrationTest`() = runTest {
+        // Given - Múltiples jobs de diferentes tipos para verificar éxito consistente
+        val jobs = listOf(
+            Job(
+                id = JobId("consistency-script"),
+                definition = JobDefinition(
+                    payload = JobPayload.Script("println('Consistency test script')"),
+                    environment = emptyMap()
+                )
+            ),
+            Job(
+                id = JobId("consistency-command"),
+                definition = JobDefinition(
+                    payload = JobPayload.Command(listOf("echo", "Consistency test command")),
+                    environment = emptyMap()
+                )
+            ),
+            Job(
+                id = JobId("consistency-compiled"),
+                definition = JobDefinition(
+                    payload = JobPayload.CompiledScript(
+                        content = "println('Consistency test compiled')",
+                        libraries = emptyList()
+                    ),
+                    environment = emptyMap()
+                )
+            )
+        )
+        val workerId = WorkerId("consistency-worker")
+
+        // When - Ejecutar todos los jobs
+        val results = jobs.map { job ->
+            pipelineDslStrategy.execute(job, workerId) { }
+        }
+
+        // Then - Verificar 100% de éxito
+        results.forEach { result ->
+            assertEquals(JobStatus.COMPLETED, result.status, "All jobs should complete successfully")
+            assertEquals(0, result.exitCode, "All jobs should have exit code 0")
+            assertNotNull(result.output, "All jobs should produce output")
+        }
+        
+        // Verificar métricas consistentes
+        results.forEach { result ->
+            assertNotNull(result.metrics)
+            assertTrue(result.metrics!!.containsKey("executionTimeMs"))
+            assertTrue(result.metrics!!["executionTimeMs"] as Long > 0)
+        }
+    }
+
+    @Test
+    fun `Pipeline DSL should handle real-time output streaming like worker system`() = runTest {
+        // Given - Job que produce output en tiempo real
+        val streamingJob = Job(
+            id = JobId("streaming-test"),
+            definition = JobDefinition(
+                payload = JobPayload.Script("""
+                    println("Line 1: Starting execution")
+                    Thread.sleep(100)
+                    println("Line 2: Processing data")
+                    Thread.sleep(100)
+                    println("Line 3: Finalizing")
+                """.trimIndent()),
+                environment = emptyMap()
+            )
+        )
+        val workerId = WorkerId("streaming-worker")
+        val outputChunks = mutableListOf<JobOutputChunk>()
+
+        // When - Ejecutar capturando output en tiempo real
+        val result = pipelineDslStrategy.execute(streamingJob, workerId) { chunk ->
+            outputChunks.add(chunk)
+        }
+
+        // Then - Verificar streaming en tiempo real
+        assertEquals(JobStatus.COMPLETED, result.status)
+        assertTrue(outputChunks.isNotEmpty(), "Should capture streaming output")
+        
+        // Verificar que se capturó output progresivamente
+        val allOutput = outputChunks.joinToString("") { String(it.data) }
+        assertTrue(allOutput.contains("Line 1"), "Should capture first line")
+        assertTrue(allOutput.contains("Line 2"), "Should capture second line")
+        assertTrue(allOutput.contains("Line 3"), "Should capture third line")
+    }
+
+    @Test
+    fun `Pipeline DSL should provide better error handling than legacy strategies`() = runTest {
+        // Given - Job que va a fallar
+        val failingJob = Job(
+            id = JobId("error-handling-test"),
+            definition = JobDefinition(
+                payload = JobPayload.Command(listOf("nonexistent-command-xyz")),
+                environment = emptyMap()
+            )
+        )
+        val workerId = WorkerId("error-worker")
+
+        // When - Ejecutar job que falla
+        val result = pipelineDslStrategy.execute(failingJob, workerId) { }
+
+        // Then - Verificar error handling mejorado
+        assertEquals(JobStatus.FAILED, result.status)
+        assertTrue(result.exitCode != 0)
+        assertNotNull(result.errorMessage)
+        assertTrue(result.errorMessage!!.contains("Pipeline DSL execution failed"))
+        
+        // Verificar que aún proporciona métricas útiles
+        assertNotNull(result.metrics)
+        assertTrue(result.metrics!!.containsKey("error"))
+    }
+
+    @Test
+    fun `Pipeline DSL should support embedded server testing pattern`() = runTest {
+        // Given - Job usando el servidor embebido
+        val serverJob = Job(
+            id = JobId("server-integration-test"),
+            definition = JobDefinition(
+                payload = JobPayload.Script("""
+                    println("Testing integration with embedded server")
+                    println("Server port: ${server.port}")
+                    println("Server running: ${server.isRunning()}")
+                """.trimIndent()),
+                environment = mapOf("SERVER_PORT" to server.port.toString())
+            )
+        )
+        val workerId = WorkerId("server-worker")
+
+        // When - Ejecutar con contexto del servidor
+        val result = pipelineDslStrategy.execute(serverJob, workerId) { }
+
+        // Then - Verificar integración con servidor embebido
+        assertEquals(JobStatus.COMPLETED, result.status)
+        assertNotNull(result.output)
+        
+        // El servidor debe seguir funcionando después
+        assertTrue(server.isRunning(), "Server should remain running after job execution")
+    }
+
+    @Test
+    fun `Pipeline DSL should demonstrate architectural simplification`() {
+        // Given - Pipeline DSL strategy única
+
+        // When - Verificar capacidades
+        val canHandleScript = pipelineDslStrategy.canHandle(JobType.SCRIPT)
+        val canHandleCommand = pipelineDslStrategy.canHandle(JobType.COMMAND)
+        val canHandleCompiled = pipelineDslStrategy.canHandle(JobType.COMPILED_SCRIPT)
+        val supportedTypes = pipelineDslStrategy.getSupportedJobTypes()
+
+        // Then - Verificar que una sola estrategia maneja todo
+        assertTrue(canHandleScript, "Should handle script jobs")
+        assertTrue(canHandleCommand, "Should handle command jobs")
+        assertTrue(canHandleCompiled, "Should handle compiled script jobs")
+        
+        assertEquals(3, supportedTypes.size, "Should support all legacy job types")
+        assertTrue(supportedTypes.contains(JobType.SCRIPT))
+        assertTrue(supportedTypes.contains(JobType.COMMAND))
+        assertTrue(supportedTypes.contains(JobType.COMPILED_SCRIPT))
+    }
+
+    @Test
+    fun `Pipeline DSL should maintain worker integration test patterns`() = runTest {
+        // Given - Test siguiendo el patrón de BasicIntegrationTest
+        val testJob = Job(
+            id = JobId("pattern-test"),
+            definition = JobDefinition(
+                payload = JobPayload.Script("println('Following integration test patterns')"),
+                environment = emptyMap()
+            )
+        )
+        val workerId = WorkerId("pattern-worker")
+
+        // When - Ejecutar siguiendo el patrón establecido
+        assertDoesNotThrow {
+            val result = pipelineDslStrategy.execute(testJob, workerId) { }
+            
+            // Then - Verificar resultados siguiendo el patrón
+            assertEquals(JobStatus.COMPLETED, result.status)
+            assertEquals(0, result.exitCode)
+        }
+        
+        // Verificar que el servidor sigue disponible para otros tests
+        assertTrue(server.isRunning())
+        assertTrue(server.port > 0)
+    }
+}

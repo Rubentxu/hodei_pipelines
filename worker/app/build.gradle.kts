@@ -4,7 +4,7 @@ plugins {
 }
 
 tasks.jar {
-    archiveBaseName.set("worker-application")
+    archiveBaseName.set("worker-app")
 }
 
 dependencies {

@@ -4,7 +4,7 @@ import dev.rubentxu.hodei.pipelines.domain.job.Job
 import dev.rubentxu.hodei.pipelines.domain.job.JobPayload
 import dev.rubentxu.hodei.pipelines.domain.job.JobType
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
-import dev.rubentxu.hodei.pipelines.infrastructure.execution.DefaultExecutionStrategyManager
+import dev.rubentxu.hodei.pipelines.application.worker.execution.DefaultExecutionStrategyManager
 import dev.rubentxu.hodei.pipelines.domain.worker.ports.ExecutionStrategyManager
 import dev.rubentxu.hodei.pipelines.infrastructure.execution.strategies.KotlinScriptingStrategy
 import dev.rubentxu.hodei.pipelines.infrastructure.execution.strategies.SystemCommandStrategy

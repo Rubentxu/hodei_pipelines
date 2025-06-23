@@ -1,5 +1,14 @@
 rootProject.name = "hodei-pipelines"
 
+
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google() // If you have Android components
+        mavenCentral()
+    }
+}
+
 include(
     ":core:domain",
     ":core:application",
@@ -9,5 +18,7 @@ include(
     ":worker:app",
     ":worker:domain",
     ":worker:application",
-    ":worker:infrastructure"
+    ":worker:infrastructure",
+    ":pipeline-dsl:core",
+    ":pipeline-dsl:cli"
 )

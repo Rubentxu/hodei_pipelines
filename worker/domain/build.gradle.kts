@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+tasks.jar {
+    archiveBaseName.set("worker-domain")
+}
+
 dependencies {
     implementation(project(":core:domain"))
     implementation(libs.kotlinx.coroutines.core)

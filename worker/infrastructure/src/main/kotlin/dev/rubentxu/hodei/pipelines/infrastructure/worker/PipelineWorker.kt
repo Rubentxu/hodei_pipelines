@@ -27,6 +27,25 @@ import dev.rubentxu.hodei.pipelines.domain.job.JobId as DomainJobId
 import dev.rubentxu.hodei.pipelines.domain.job.JobPayload as DomainJobPayload
 import dev.rubentxu.hodei.pipelines.domain.job.JobStatus as DomainJobStatus
 import dev.rubentxu.hodei.pipelines.proto.JobDefinition as GrpcJobDefinition
+import dev.rubentxu.hodei.pipelines.proto.JobExecutionStatus as GrpcJobExecutionStatus
+import dev.rubentxu.hodei.pipelines.proto.WorkerStatus as GrpcWorkerStatus
+import dev.rubentxu.hodei.pipelines.proto.WorkerIdentifier as GrpcWorkerIdentifier
+import dev.rubentxu.hodei.pipelines.proto.WorkerRegistrationRequest as GrpcWorkerRegistrationRequest
+import dev.rubentxu.hodei.pipelines.proto.WorkerHeartbeat as GrpcWorkerHeartbeat
+import dev.rubentxu.hodei.pipelines.proto.WorkerToServer as GrpcWorkerToServer
+import dev.rubentxu.hodei.pipelines.proto.ServerToWorker as GrpcServerToWorker
+import dev.rubentxu.hodei.pipelines.proto.ExecuteJobRequest as GrpcExecuteJobRequest
+import dev.rubentxu.hodei.pipelines.proto.JobOutputAndStatus as GrpcJobOutputAndStatus
+import dev.rubentxu.hodei.pipelines.proto.JobOutputChunk as GrpcJobOutputChunk
+import dev.rubentxu.hodei.pipelines.proto.ArtifactChunk as GrpcArtifactChunk
+import dev.rubentxu.hodei.pipelines.proto.ArtifactAck as GrpcArtifactAck
+import dev.rubentxu.hodei.pipelines.proto.ArtifactCacheQuery as GrpcArtifactCacheQuery
+import dev.rubentxu.hodei.pipelines.proto.ArtifactCacheResponse as GrpcArtifactCacheResponse
+import dev.rubentxu.hodei.pipelines.proto.ArtifactCacheInfo as GrpcArtifactCacheInfo
+import dev.rubentxu.hodei.pipelines.proto.ArtifactCacheStatus as GrpcArtifactCacheStatus
+import dev.rubentxu.hodei.pipelines.proto.CompressionType as GrpcCompressionType
+import dev.rubentxu.hodei.pipelines.proto.JobIdentifier as GrpcJobIdentifier
+import dev.rubentxu.hodei.pipelines.proto.JobStatus as GrpcJobStatus
 
 private val logger = KotlinLogging.logger {}
 
@@ -74,8 +93,8 @@ class PipelineWorker(
 
     private suspend fun registerWorker() {
         try {
-            val request = WorkerRegistrationRequest.newBuilder()
-                .setWorkerId(WorkerIdentifier.newBuilder().setValue(workerId).build())
+            val request = GrpcWorkerRegistrationRequest.newBuilder()
+                .setWorkerId(GrpcWorkerIdentifier.newBuilder().setValue(workerId).build())
                 .setWorkerName(workerName)
                 .putAllCapabilities(mapOf("os" to System.getProperty("os.name")))
                 .build()
@@ -91,16 +110,16 @@ class PipelineWorker(
     }
 
     private suspend fun manageCommunicationChannel() {
-        val toServerChannel = Channel<WorkerToServer>(Channel.UNLIMITED)
+        val toServerChannel = Channel<GrpcWorkerToServer>(Channel.UNLIMITED)
         coroutineScope {
             // Heartbeat coroutine
             launch {
                 while (isActive) {
-                    val heartbeat = WorkerHeartbeat.newBuilder()
-                        .setWorkerId(WorkerIdentifier.newBuilder().setValue(workerId).build())
-                        .setStatus(dev.rubentxu.hodei.pipelines.proto.WorkerStatus.WORKER_STATUS_READY)
+                    val heartbeat = GrpcWorkerHeartbeat.newBuilder()
+                        .setWorkerId(GrpcWorkerIdentifier.newBuilder().setValue(workerId).build())
+                        .setStatus(GrpcWorkerStatus.WORKER_STATUS_READY)
                         .build()
-                    val message = WorkerToServer.newBuilder().setHeartbeat(heartbeat).build()
+                    val message = GrpcWorkerToServer.newBuilder().setHeartbeat(heartbeat).build()
                     toServerChannel.send(message)
                     delay(10000) // 10 seconds
                 }
@@ -112,7 +131,7 @@ class PipelineWorker(
                     val fromServerFlow = jobExecutorStub.jobExecutionChannel(toServerChannel.receiveAsFlow())
                     fromServerFlow.collect { serverMessage ->
                         when (serverMessage.messageCase) {
-                            ServerToWorker.MessageCase.JOB_REQUEST -> {
+                            GrpcServerToWorker.MessageCase.JOB_REQUEST -> {
                                 val jobRequest = serverMessage.jobRequest
                                 logger.info { "Received job request: ${jobRequest.jobDefinition.name}" }
                                 launch {
@@ -122,32 +141,32 @@ class PipelineWorker(
                                 }
                             }
 
-                            ServerToWorker.MessageCase.CONTROL_SIGNAL -> {
+                            GrpcServerToWorker.MessageCase.CONTROL_SIGNAL -> {
                                 val controlSignal = serverMessage.controlSignal
                                 logger.info { "Received control signal: ${controlSignal.type}" }
                                 // Handle control signals (e.g., cancel job)
                             }
 
-                            ServerToWorker.MessageCase.ARTIFACT_CHUNK -> {
+                            GrpcServerToWorker.MessageCase.ARTIFACT_CHUNK -> {
                                 val artifactChunk = serverMessage.artifactChunk
                                 logger.debug { "Received artifact chunk for ${artifactChunk.artifactId}, sequence ${artifactChunk.sequence}" }
 
                                 launch {
                                     val ack = handleArtifactChunk(artifactChunk)
-                                    val ackMessage = WorkerToServer.newBuilder()
+                                    val ackMessage = GrpcWorkerToServer.newBuilder()
                                         .setArtifactAck(ack)
                                         .build()
                                     toServerChannel.send(ackMessage)
                                 }
                             }
 
-                            ServerToWorker.MessageCase.CACHE_QUERY -> {
+                            GrpcServerToWorker.MessageCase.CACHE_QUERY -> {
                                 val cacheQuery = serverMessage.cacheQuery
                                 logger.debug { "Received cache query for job ${cacheQuery.jobId} with ${cacheQuery.artifactIdsList.size} artifacts" }
 
                                 launch {
                                     val cacheResponse = handleCacheQuery(cacheQuery)
-                                    val responseMessage = WorkerToServer.newBuilder()
+                                    val responseMessage = GrpcWorkerToServer.newBuilder()
                                         .setCacheResponse(cacheResponse)
                                         .build()
                                     toServerChannel.send(responseMessage)
@@ -171,7 +190,7 @@ class PipelineWorker(
         }
     }
 
-    private fun executeJobRequest(request: ExecuteJobRequest): Flow<JobExecutionEvent> {
+    private fun executeJobRequest(request: GrpcExecuteJobRequest): Flow<JobExecutionEvent> {
         val grpcJobDef = request.jobDefinition
         val domainJobDef = grpcJobDef.toDomain()
         val domainJob = DomainJob(
@@ -192,12 +211,12 @@ class PipelineWorker(
         }
     }
 
-    private fun convertEventToWorkerMessage(event: JobExecutionEvent): WorkerToServer {
+    private fun convertEventToWorkerMessage(event: JobExecutionEvent): GrpcWorkerToServer {
         val jobOutputAndStatus = when (event) {
             is JobExecutionEvent.Started ->
-                JobOutputAndStatus.newBuilder()
+                GrpcJobOutputAndStatus.newBuilder()
                     .setStatusUpdate(
-                        dev.rubentxu.hodei.pipelines.proto.JobExecutionStatus.newBuilder()
+                        GrpcJobExecutionStatus.newBuilder()
                             .setJobId(event.jobId.toGrpc())
                             .setStatus(DomainJobStatus.RUNNING.toGrpc())
                             .build()
@@ -205,9 +224,9 @@ class PipelineWorker(
                     .build()
 
             is JobExecutionEvent.OutputReceived ->
-                JobOutputAndStatus.newBuilder()
+                GrpcJobOutputAndStatus.newBuilder()
                     .setOutputChunk(
-                        dev.rubentxu.hodei.pipelines.proto.JobOutputChunk.newBuilder()
+                        GrpcJobOutputChunk.newBuilder()
                             .setJobId(event.jobId.toGrpc())
                             .setData(ByteString.copyFrom(event.chunk.data))
                             .setIsStderr(event.chunk.isError)
@@ -218,15 +237,15 @@ class PipelineWorker(
                                     .build()
                             )
                             .setCompressed(false)
-                            .setCompressionType(dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_NONE)
+                            .setCompressionType(GrpcCompressionType.COMPRESSION_NONE)
                             .build()
                     )
                     .build()
 
             is JobExecutionEvent.Completed ->
-                JobOutputAndStatus.newBuilder()
+                GrpcJobOutputAndStatus.newBuilder()
                     .setStatusUpdate(
-                        dev.rubentxu.hodei.pipelines.proto.JobExecutionStatus.newBuilder()
+                        GrpcJobExecutionStatus.newBuilder()
                             .setJobId(event.jobId.toGrpc())
                             .setStatus(DomainJobStatus.COMPLETED.toGrpc())
                             .setExitCode(event.exitCode)
@@ -236,9 +255,9 @@ class PipelineWorker(
                     .build()
 
             is JobExecutionEvent.Failed ->
-                JobOutputAndStatus.newBuilder()
+                GrpcJobOutputAndStatus.newBuilder()
                     .setStatusUpdate(
-                        dev.rubentxu.hodei.pipelines.proto.JobExecutionStatus.newBuilder()
+                        GrpcJobExecutionStatus.newBuilder()
                             .setJobId(event.jobId.toGrpc())
                             .setStatus(DomainJobStatus.FAILED.toGrpc())
                             .setMessage(event.error)
@@ -248,9 +267,9 @@ class PipelineWorker(
                     .build()
 
             is JobExecutionEvent.Cancelled ->
-                JobOutputAndStatus.newBuilder()
+                GrpcJobOutputAndStatus.newBuilder()
                     .setStatusUpdate(
-                        dev.rubentxu.hodei.pipelines.proto.JobExecutionStatus.newBuilder()
+                        GrpcJobExecutionStatus.newBuilder()
                             .setJobId(event.jobId.toGrpc())
                             .setStatus(DomainJobStatus.CANCELLED.toGrpc())
                             .setMessage("Job was cancelled")
@@ -260,7 +279,7 @@ class PipelineWorker(
 
             else -> throw IllegalArgumentException("Unknown event type: ${event::class.simpleName}")
         }
-        return WorkerToServer.newBuilder().setJobOutputAndStatus(jobOutputAndStatus).build()
+        return GrpcWorkerToServer.newBuilder().setJobOutputAndStatus(jobOutputAndStatus).build()
     }
 
     override fun close() {
@@ -274,7 +293,7 @@ class PipelineWorker(
 
     private suspend fun unregisterWorker() {
         try {
-            workerManagementStub.unregisterWorker(WorkerIdentifier.newBuilder().setValue(workerId).build())
+            workerManagementStub.unregisterWorker(GrpcWorkerIdentifier.newBuilder().setValue(workerId).build())
             logger.info { "Worker $workerId unregistered successfully." }
         } catch (e: Exception) {
             logger.error(e) { "Error unregistering worker" }
@@ -294,7 +313,7 @@ class PipelineWorker(
     /**
      * Handle incoming artifact chunk (Fase 2: With compression and enhanced cache)
      */
-    private suspend fun handleArtifactChunk(chunk: dev.rubentxu.hodei.pipelines.proto.ArtifactChunk): dev.rubentxu.hodei.pipelines.proto.ArtifactAck {
+    private suspend fun handleArtifactChunk(chunk: GrpcArtifactChunk): GrpcArtifactAck {
         return try {
             val artifactId = chunk.artifactId
 
@@ -302,7 +321,7 @@ class PipelineWorker(
             val cachedArtifact = persistentArtifacts[artifactId]
             if (cachedArtifact != null) {
                 logger.info { "Artifact $artifactId already in cache, skipping transfer" }
-                return dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+                return GrpcArtifactAck.newBuilder()
                     .setArtifactId(artifactId)
                     .setSuccess(true)
                     .setCacheHit(true)
@@ -350,7 +369,7 @@ class PipelineWorker(
                     // Remove from temporary cache
                     artifactCache.remove(artifactId)
 
-                    dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+                    GrpcArtifactAck.newBuilder()
                         .setArtifactId(artifactId)
                         .setSuccess(true)
                         .setCacheHit(false)
@@ -359,7 +378,7 @@ class PipelineWorker(
                         .setCacheStatus(buildCacheStatus())
                         .build()
                 } else {
-                    dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+                    GrpcArtifactAck.newBuilder()
                         .setArtifactId(artifactId)
                         .setSuccess(false)
                         .setCacheHit(false)
@@ -368,7 +387,7 @@ class PipelineWorker(
                 }
             } else {
                 // Acknowledge chunk received
-                dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+                GrpcArtifactAck.newBuilder()
                     .setArtifactId(artifactId)
                     .setSuccess(true)
                     .setCacheHit(false)
@@ -379,7 +398,7 @@ class PipelineWorker(
         } catch (e: Exception) {
             logger.error(e) { "Error handling artifact chunk for ${chunk.artifactId}" }
 
-            dev.rubentxu.hodei.pipelines.proto.ArtifactAck.newBuilder()
+            GrpcArtifactAck.newBuilder()
                 .setArtifactId(chunk.artifactId)
                 .setSuccess(false)
                 .setCacheHit(false)
@@ -409,13 +428,13 @@ class PipelineWorker(
     /**
      * Handle cache query from server (Fase 2)
      */
-    private suspend fun handleCacheQuery(query: dev.rubentxu.hodei.pipelines.proto.ArtifactCacheQuery): dev.rubentxu.hodei.pipelines.proto.ArtifactCacheResponse {
+    private suspend fun handleCacheQuery(query: GrpcArtifactCacheQuery): GrpcArtifactCacheResponse {
         logger.debug { "Processing cache query for job ${query.jobId} with ${query.artifactIdsList.size} artifacts" }
 
         val artifactInfos = query.artifactIdsList.map { artifactId ->
             val cachedArtifact = persistentArtifacts[artifactId]
 
-            dev.rubentxu.hodei.pipelines.proto.ArtifactCacheInfo.newBuilder()
+            GrpcArtifactCacheInfo.newBuilder()
                 .setArtifactId(artifactId)
                 .setCached(cachedArtifact != null)
                 .setCachedChecksum(cachedArtifact?.checksum ?: "")
@@ -423,7 +442,7 @@ class PipelineWorker(
                 .build()
         }
 
-        return dev.rubentxu.hodei.pipelines.proto.ArtifactCacheResponse.newBuilder()
+        return GrpcArtifactCacheResponse.newBuilder()
             .setJobId(query.jobId)
             .addAllArtifacts(artifactInfos)
             .build()
@@ -470,11 +489,11 @@ class PipelineWorker(
         return try {
             val compressedData = download.buffer.flatMap { it.toList() }.toByteArray()
             val finalData = when (download.compressionType) {
-                dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_GZIP -> {
+                GrpcCompressionType.COMPRESSION_GZIP -> {
                     decompressGzip(compressedData)
                 }
 
-                dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_ZSTD -> {
+                GrpcCompressionType.COMPRESSION_ZSTD -> {
                     // For now, fallback to no decompression (ZSTD would require additional dependency)
                     logger.warn { "ZSTD decompression not implemented, using compressed data as-is" }
                     compressedData
@@ -503,11 +522,11 @@ class PipelineWorker(
     private fun getFinalArtifactData(download: ArtifactDownload): ByteArray {
         val compressedData = download.buffer.flatMap { it.toList() }.toByteArray()
         return when (download.compressionType) {
-            dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_GZIP -> {
+            GrpcCompressionType.COMPRESSION_GZIP -> {
                 decompressGzip(compressedData)
             }
 
-            dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_ZSTD -> {
+            GrpcCompressionType.COMPRESSION_ZSTD -> {
                 logger.warn { "ZSTD decompression not implemented" }
                 compressedData
             }
@@ -519,10 +538,10 @@ class PipelineWorker(
     /**
      * Build cache status for response
      */
-    private fun buildCacheStatus(): dev.rubentxu.hodei.pipelines.proto.ArtifactCacheStatus {
+    private fun buildCacheStatus(): GrpcArtifactCacheStatus {
         val totalCacheSize = persistentArtifacts.values.sumOf { it.size }
 
-        return dev.rubentxu.hodei.pipelines.proto.ArtifactCacheStatus.newBuilder()
+        return GrpcArtifactCacheStatus.newBuilder()
             .setHasArtifact(persistentArtifacts.isNotEmpty())
             .setCachedArtifactsCount(persistentArtifacts.size)
             .setCacheSizeBytes(totalCacheSize)
@@ -576,17 +595,17 @@ fun GrpcJobDefinition.toDomain(): DomainJobDefinition {
     )
 }
 
-fun DomainJobId.toGrpc(): dev.rubentxu.hodei.pipelines.proto.JobIdentifier {
-    return dev.rubentxu.hodei.pipelines.proto.JobIdentifier.newBuilder().setValue(this.value).build()
+fun DomainJobId.toGrpc(): GrpcJobIdentifier {
+    return GrpcJobIdentifier.newBuilder().setValue(this.value).build()
 }
 
-fun DomainJobStatus.toGrpc(): dev.rubentxu.hodei.pipelines.proto.JobStatus {
+fun DomainJobStatus.toGrpc(): GrpcJobStatus {
     return when (this) {
-        DomainJobStatus.QUEUED -> dev.rubentxu.hodei.pipelines.proto.JobStatus.JOB_STATUS_QUEUED
-        DomainJobStatus.RUNNING -> dev.rubentxu.hodei.pipelines.proto.JobStatus.JOB_STATUS_RUNNING
-        DomainJobStatus.COMPLETED -> dev.rubentxu.hodei.pipelines.proto.JobStatus.JOB_STATUS_SUCCESS
-        DomainJobStatus.FAILED -> dev.rubentxu.hodei.pipelines.proto.JobStatus.JOB_STATUS_FAILED
-        DomainJobStatus.CANCELLED -> dev.rubentxu.hodei.pipelines.proto.JobStatus.JOB_STATUS_CANCELLED
+        DomainJobStatus.QUEUED -> GrpcJobStatus.JOB_STATUS_QUEUED
+        DomainJobStatus.RUNNING -> GrpcJobStatus.JOB_STATUS_RUNNING
+        DomainJobStatus.COMPLETED -> GrpcJobStatus.JOB_STATUS_SUCCESS
+        DomainJobStatus.FAILED -> GrpcJobStatus.JOB_STATUS_FAILED
+        DomainJobStatus.CANCELLED -> GrpcJobStatus.JOB_STATUS_CANCELLED
     }
 }
 
@@ -597,7 +616,7 @@ data class ArtifactDownload(
     val artifactId: String,
     val buffer: MutableList<ByteArray>,
     val expectedChecksum: String,
-    val compressionType: dev.rubentxu.hodei.pipelines.proto.CompressionType = dev.rubentxu.hodei.pipelines.proto.CompressionType.COMPRESSION_NONE,
+    val compressionType: GrpcCompressionType = GrpcCompressionType.COMPRESSION_NONE,
     val originalSize: Int = 0
 )
 
