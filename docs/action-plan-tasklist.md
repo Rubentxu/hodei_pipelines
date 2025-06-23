@@ -7,61 +7,7 @@ Implementar un sistema completo de CI/CD con workers efímeros tipo Jenkins, API
 
 ## **🔥 TAREAS CRÍTICAS (ALTA PRIORIDAD)**
 
-### **BACKEND CORE**
 
-#### **[T01] Implementar Real Kubernetes Integration**
-- **File**: `backend/infrastructure/src/main/kotlin/.../orchestration/RealKubernetesOrchestrator.kt`
-- **Dependencies**: Kubernetes Java Client 18.0.0
-- **Descripción**: Reemplazar `SimpleKubernetesOrchestrator` con implementación real
-- **Deliverables**:
-  - Creación real de Pods en Kubernetes
-  - Destrucción automática de Pods
-  - Gestión de recursos y quotas
-  - Error handling y logs
-- **Referencia**: `ephemeral-workers-roadmap.md` - FASE 1
-- **Estimación**: 5-7 días
-
-#### **[T02] Crear Sistema de Worker Templates**
-- **Files**: 
-  - `core/domain/src/main/kotlin/.../orchestration/WorkerTemplate.kt`
-  - `core/domain/src/main/kotlin/.../orchestration/BuiltInWorkerTemplates.kt`
-  - `core/infrastructure/src/main/kotlin/.../repository/InMemoryWorkerTemplateRepository.kt`
-- **Descripción**: Sistema completo de templates especializados
-- **Deliverables**:
-  - Templates para Java, Node, Docker, Python, Go
-  - Repository para gestión de templates
-  - Template selection logic
-  - API DTOs para templates
-- **Referencia**: `ephemeral-workers-roadmap.md` - FASE 2.2
-- **Estimación**: 3-4 días
-
-#### **[T03] Implementar API REST Base**
-- **Files**:
-  - `backend/rest-api/src/main/kotlin/HodeiRestServer.kt`
-  - `backend/rest-api/src/main/kotlin/routes/JobRoutes.kt`
-  - `backend/rest-api/src/main/kotlin/routes/WorkerRoutes.kt`
-  - `backend/rest-api/src/main/kotlin/dto/ApiDtos.kt`
-- **Dependencies**: Ktor Server, Kotlinx Serialization
-- **Descripción**: API REST completa para jobs, workers y templates
-- **Deliverables**:
-  - CRUD endpoints para jobs
-  - Worker management endpoints
-  - Worker templates endpoints
-  - API DTOs y mappers
-  - Basic error handling
-- **Referencia**: `api-rest-and-ui-plan.md` - Section 1.2
-- **Estimación**: 4-5 días
-
-#### **[T04] Desarrollar EphemeralWorkerManager**
-- **File**: `core/application/src/main/kotlin/.../EphemeralWorkerManager.kt`
-- **Descripción**: Manager completo para workers efímeros
-- **Deliverables**:
-  - Dynamic worker provisioning
-  - Template selection logic
-  - Auto-destroy scheduling
-  - Integration con CreateAndExecuteJobUseCase
-- **Referencia**: `ephemeral-workers-roadmap.md` - FASE 3.1
-- **Estimación**: 5-6 días
 
 #### **[T05] Setup Kotlin Compose Multiplatform**
 - **Files**:

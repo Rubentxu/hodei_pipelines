@@ -1,15 +1,16 @@
-# Contexto del Producto: hodei-pipelines
+# Product Context: A Superior Pipeline DSL
 
-## 1. Problema a Resolver
+## Por qué
 
-*(A completar: Describir en detalle el problema que `hodei-pipelines` busca solucionar. ¿Qué dificultades o ineficiencias existen en los procesos actuales que este proyecto pretende abordar? Ejemplo: "Las soluciones de CI/CD existentes son monolíticas y difíciles de escalar horizontalmente. Se necesita un sistema ligero y distribuido que permita ejecutar tareas en una flota de máquinas heterogéneas.")*
+Las soluciones existentes como el DSL de Jenkins (basado en Groovy) o configuraciones en YAML carecen de la seguridad de tipos y el soporte de IDE que los lenguajes modernos como Kotlin pueden ofrecer. Esto a menudo conduce a errores en tiempo de ejecución, una curva de aprendizaje más pronunciada y una experiencia de desarrollador deficiente.
 
-## 2. Visión del Producto
+Este proyecto nace para resolver esos problemas, creando un DSL para la definición de pipelines que sea:
 
-`hodei-pipelines` aspira a ser un orquestador de tareas distribuido, simple y de alto rendimiento. Su objetivo es proporcionar a los desarrolladores una forma sencilla de definir y ejecutar flujos de trabajo complejos sobre una infraestructura dinámica. La comunicación se basa en gRPC para garantizar un bajo overhead y una alta eficiencia.
+- **Seguro en Tipos**: La mayoría de los errores se detectan en tiempo de compilación, no durante la ejecución del pipeline.
+- **Expresivo y Legible**: La sintaxis debe ser clara, concisa y seguir los modismos de Kotlin.
+- **Potente**: Aprovechar todo el poder de un lenguaje de programación completo para definir la lógica del pipeline.
+- **Extensible**: Permitir que terceros añadan nuevas funcionalidades (pasos, agentes) de forma segura y desacoplada.
 
-## 3. Objetivos de la Experiencia de Usuario (UX)
+## Cómo
 
-- **Simplicidad**: La definición de un pipeline y la interacción con el sistema deben ser intuitivas.
-- **Transparencia**: El usuario debe poder consultar el estado de sus ejecuciones y acceder a los logs en tiempo real de forma sencilla.
-- **Fiabilidad**: El sistema debe ser predecible y gestionar los fallos de forma controlada, informando al usuario adecuadamente.
+El DSL se construirá sobre una base sólida de principios de diseño de software y características de Kotlin. Se enfocará en proporcionar una estructura declarativa y jerárquica para definir pipelines, inspirada en los conceptos probados de `pipeline`, `stage`, `step`, pero mejorada con el sistema de tipos de Kotlin. La meta es ofrecer una experiencia de "Pipeline-as-Code" de primera clase, con autocompletado, refactorización segura y depuración estándar.

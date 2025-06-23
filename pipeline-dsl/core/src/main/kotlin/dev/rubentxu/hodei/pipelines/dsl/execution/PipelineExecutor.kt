@@ -2,7 +2,7 @@ package dev.rubentxu.hodei.pipelines.dsl.execution
 
 import dev.rubentxu.hodei.pipelines.domain.job.JobId
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
-import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.PipelineContext
+import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineContext
 import dev.rubentxu.hodei.pipelines.dsl.model.*
 import dev.rubentxu.hodei.pipelines.port.*
 import kotlinx.coroutines.*
@@ -37,13 +37,14 @@ class PipelineEngine(
         runtimeEnvironment: Map<String, String> = emptyMap()
     ): PipelineExecutionResult = coroutineScope {
         
-        // Crear contexto de ejecución integrado
-        val context = pipeline.createExecutionContext(
-            jobId = jobId,
-            workerId = workerId,
+        // Crear contexto de ejecución standalone del Pipeline DSL
+        val context = PipelineContext(
+            jobId = jobId.value,
+            workerId = workerId.value,
+            workingDirectory = java.io.File(System.getProperty("user.dir")),
+            environment = (pipeline.environment + runtimeEnvironment).toMutableMap(),
             outputChannel = outputChannel,
-            eventChannel = eventChannel,
-            runtimeEnvironment = runtimeEnvironment
+            eventChannel = eventChannel
         )
         
         val startTime = System.currentTimeMillis()
@@ -76,7 +77,7 @@ class PipelineEngine(
             val stageResults = mutableListOf<StageExecutionResult>()
             
             for (stage in pipeline.stages) {
-                if (!stage.canExecute(buildExecutionContext(context, runtimeEnvironment))) {
+                if (!stage.shouldExecute(context)) {
                     logger.info { "Skipping stage '${stage.name}' due to when condition" }
                     eventChannel.send(PipelineEvent.StageSkipped(
                         jobId = jobId,

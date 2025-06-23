@@ -3,7 +3,7 @@ package dev.rubentxu.hodei.pipelines.dsl.execution
 import dev.rubentxu.hodei.pipelines.domain.job.Job
 import dev.rubentxu.hodei.pipelines.domain.job.JobType
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
-import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.PipelineContext
+import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineContext
 import dev.rubentxu.hodei.pipelines.domain.worker.model.execution.JobExecutionResult
 import dev.rubentxu.hodei.pipelines.domain.worker.ports.JobExecutionStrategy
 import dev.rubentxu.hodei.pipelines.dsl.model.Pipeline

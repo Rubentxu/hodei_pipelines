@@ -2,7 +2,7 @@ package dev.rubentxu.hodei.pipelines.dsl.model
 
 import dev.rubentxu.hodei.pipelines.domain.job.JobId
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
-import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.PipelineContext
+import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineContext
 import dev.rubentxu.hodei.pipelines.port.JobExecutionEvent
 import dev.rubentxu.hodei.pipelines.port.JobOutputChunk
 import kotlinx.coroutines.channels.Channel

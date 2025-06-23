@@ -1,61 +1,164 @@
-# Casos de Uso y Escenarios BDD
+# Use Cases and BDD Scenarios
 
-Este documento define los casos de uso clave del sistema `hodei-pipelines` y sus correspondientes escenarios de comportamiento (BDD) utilizando la sintaxis Gherkin. Estos escenarios sirven como especificación ejecutable y guían el desarrollo y las pruebas.
+# Use Cases and BDD Scenarios
 
-## 1. Caso de Uso: Creación y Ejecución de un Trabajo
+Este documento contendrá la definición de los Casos de Uso y los escenarios BDD en formato Gherkin para guiar el desarrollo.
 
-- **ID**: UC-001
-- **Nombre**: Crear y ejecutar un nuevo trabajo.
-- **Actor**: Usuario del sistema (a través de un cliente API).
-- **Descripción**: Un usuario envía la definición de un trabajo al sistema. El sistema lo pone en cola y, cuando hay un worker disponible, lo ejecuta y reporta el resultado.
+## Feature: Basic Pipeline Definition
 
-### Escenario: Ejecución exitosa de un trabajo de tipo comando
+**As a** pipeline author
+**I want to** define a simple pipeline structure using the Kotlin DSL
+**So that** I can create a valid and executable pipeline model.
+
+### Scenario: A user defines a simple pipeline with one stage and one step
 
 ```gherkin
-Feature: Ejecución de un trabajo
+Feature: Basic Pipeline Definition
 
-  Scenario: Un usuario ejecuta un trabajo simple de tipo comando y este se completa con éxito
-    Given un servidor Hodei-Pipelines está en funcionamiento
-    And un worker está registrado y disponible
-    When un usuario envía un nuevo trabajo con el comando "echo 'Hola Mundo'"
-    Then el trabajo se pone en cola con el estado 'QUEUED'
-    And al poco tiempo, el trabajo se asigna al worker y su estado cambia a 'RUNNING'
-    And el worker ejecuta el comando
-    And el sistema recibe la salida "Hola Mundo"
-    And finalmente, el estado del trabajo cambia a 'COMPLETED'
+  Scenario: A user defines a simple pipeline with one stage and one step
+    Given a pipeline definition
+    When the pipeline has a stage named "Build"
+    And the "Build" stage has a step that prints "Hello World"
+    Then a valid pipeline model should be created
+    And the model should have one stage named "Build"
+    And the "Build" stage should have one step
 ```
 
-### Escenario: Un trabajo falla durante la ejecución
+---
+
+### Scenario: The post block is executed on success
 
 ```gherkin
-Feature: Ejecución de un trabajo
+Feature: Post-execution Actions
 
-  Scenario: Un trabajo falla porque el comando no existe
-    Given un servidor Hodei-Pipelines está en funcionamiento
-    And un worker está registrado y disponible
-    When un usuario envía un nuevo trabajo con un comando inválido como "comando-inexistente"
-    Then el trabajo se pone en cola con el estado 'QUEUED'
-    And al poco tiempo, el trabajo se asigna al worker y su estado cambia a 'RUNNING'
-    And el worker intenta ejecutar el comando y falla
-    And el estado del trabajo cambia a 'FAILED'
-    And el sistema registra un mensaje de error indicando que el comando no se encontró
+  Scenario: The post block is executed on stage success
+    Given a pipeline with a stage containing a successful step and a post block
+    When the user executes the pipeline
+    Then the output should contain the output of the post block
+    And the execution should be successful
 ```
 
-## 2. Caso de Uso: Registro de un Worker
+---
 
-- **ID**: UC-002
-- **Nombre**: Registrar un nuevo worker en el sistema.
-- **Actor**: Aplicación Worker.
-- **Descripción**: Un nuevo worker se inicia y se registra en el servidor central para formar parte del pool de ejecución.
-
-### Escenario: Registro exitoso de un nuevo worker
+### Scenario: The post block is executed on failure
 
 ```gherkin
-Feature: Registro de Worker
+Feature: Post-execution Actions
 
-  Scenario: Un nuevo worker se inicia y se registra con éxito en el servidor
-    Given un servidor Hodei-Pipelines está en funcionamiento
-    When un nuevo worker se inicia y envía una solicitud de registro al servidor
-    Then el servidor acepta el registro
-    And el worker aparece en la lista de workers disponibles con el estado 'IDLE'
+  Scenario: The post block is executed on stage failure
+    Given a pipeline with a stage containing a failing step and a post block
+    When the user executes the pipeline
+    Then the output should contain the output of the post block
+    And the execution should be unsuccessful
+```
+
+---
+
+### Scenario: A pipeline with a failing step stops execution
+
+```gherkin
+Feature: Error Handling
+
+  Scenario: A pipeline with a failing step stops execution when failFast is enabled
+    Given a pipeline with a stage containing a failing step followed by a successful step
+    When the user executes the pipeline
+    Then the output should not contain the output of the successful step
+    And the execution should be unsuccessful
+```
+
+---
+
+### Scenario: A user executes a pipeline with a checkout step
+
+```gherkin
+Feature: Extensible Steps
+
+  Scenario: A user executes a pipeline with a checkout step
+    Given a pipeline definition with a `checkout` step for "my-repo"
+    When the user executes the pipeline
+    Then the output should contain "Checking out my-repo..."
+    And the execution should be successful
+```
+
+---
+
+## Feature: Command-Line Interface (CLI)
+
+**As a** developer
+**I want** to execute a pipeline definition from a file using the command line
+**So that** I can run my CI/CD processes easily.
+
+### Scenario: A user executes a pipeline script from the CLI
+
+```gherkin
+Feature: Command-Line Interface (CLI)
+
+  Scenario: A user executes a pipeline script from the CLI
+    Given a pipeline definition file named "my-pipeline.pipeline.kts" with a step that prints "Hello from CLI"
+    When the user runs the command "hodei-cli run my-pipeline.pipeline.kts"
+    Then the output should contain "Hello from CLI"
+    And the execution should be successful
+```
+
+---
+
+## Feature: Workspace Mounting in Docker Agent
+
+**As a** user
+**I want** my pipeline steps to access the project files
+**So that** I can build, test, and interact with my source code.
+
+### Scenario: A user executes a step that reads a file from the workspace
+
+```gherkin
+Feature: Workspace Mounting in Docker Agent
+
+  Scenario: A user executes a step that reads a file from the workspace
+    Given a file named "test_file.txt" with content "Hello from workspace" exists in the workspace
+    And a pipeline defined with a Docker agent using the "alpine:latest" image
+    And the pipeline has a stage with a step that runs "cat /hodei/workspace/test_file.txt"
+    When the pipeline is executed
+    Then the output should contain "Hello from workspace"
+```
+
+---
+
+
+## Feature: Agent Definition
+
+**As a** user
+**I want to** specify the execution environment for my pipeline
+**So that** I can run my steps inside a container with the correct tools.
+
+### Scenario: A user defines a pipeline with a Docker agent
+
+```gherkin
+Feature: Agent Definition
+
+  Scenario: A user defines a pipeline with a Docker agent
+    Given a pipeline definition
+    When the pipeline specifies a Docker agent with the image "ubuntu:latest"
+    Then a valid pipeline model should be created
+    And the model should have an agent configured
+    And the agent should be a Docker agent with the image "ubuntu:latest"
+```
+
+---
+
+## Feature: Pipeline Execution with Agent
+
+**As a** user
+**I want to** execute a pipeline within its specified agent environment
+**So that** I can ensure the steps run with the correct dependencies and tools.
+
+### Scenario: A user executes a pipeline with a Docker agent
+
+```gherkin
+Feature: Pipeline Execution with Agent
+
+  Scenario: A user executes a pipeline with a Docker agent
+    Given a pipeline defined with a Docker agent using the "alpine:latest" image
+    And the pipeline has a "Verify Environment" stage with a step that runs "cat /etc/os-release"
+    When the pipeline is executed
+    Then the output should contain "Alpine Linux"
 ```

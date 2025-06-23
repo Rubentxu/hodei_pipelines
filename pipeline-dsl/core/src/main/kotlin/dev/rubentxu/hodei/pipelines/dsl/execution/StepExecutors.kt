@@ -1,6 +1,6 @@
 package dev.rubentxu.hodei.pipelines.dsl.execution
 
-import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.PipelineContext
+import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineContext
 import dev.rubentxu.hodei.pipelines.dsl.model.Step
 import dev.rubentxu.hodei.pipelines.dsl.model.stepType
 import dev.rubentxu.hodei.pipelines.port.PipelineEvent

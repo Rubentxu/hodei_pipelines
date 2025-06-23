@@ -8,8 +8,7 @@ dependencies {
     // Core domain para eventos y modelos básicos
     api(project(":core:domain"))
     
-    // Solo worker domain para PipelineContext y tipos básicos
-    api(project(":worker:domain"))
+    // Pipeline DSL is now standalone - removed worker:domain dependency
     
     // Kotlin Core
     implementation(libs.kotlin.stdlib)

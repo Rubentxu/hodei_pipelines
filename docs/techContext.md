@@ -1,24 +1,24 @@
-# Contexto Técnico: hodei-pipelines
+# Technology Stack and Context
 
-## 1. Stack Tecnológico
+## Lenguaje Principal
+- **Kotlin**: Aprovechando todas sus características para crear un DSL seguro y expresivo.
 
-- **Lenguaje**: [Kotlin](https://kotlinlang.org/)
-- **Framework de Build**: [Gradle](https://gradle.org/)
-- **Comunicación Remota**: [gRPC](https://grpc.io/) con [Protocol Buffers](https://developers.google.com/protocol-buffers) para la definición de servicios y mensajes.
-- **Testing**: (A completar: Especificar librerías como JUnit, MockK, etc.)
-- **Contenedores**: (A completar: Especificar si se usa Docker, etc.)
+## Herramientas de Construcción y Dependencias
+- **Gradle (con Kotlin DSL)**: Para la gestión del proyecto y las dependencias.
 
-## 2. Herramientas de Desarrollo
+## Tecnologías para Extensibilidad
+- **KSP (Kotlin Symbol Processing)**: Para el procesamiento de anotaciones y generación de código en tiempo de compilación.
+- **Java ServiceLoader (SPI)**: Para el descubrimiento de plugins en tiempo de ejecución.
+- **Kotlin Compiler Plugins**: Como opción avanzada para una extensibilidad profunda.
 
-- **Control de Versiones**: Git
-- **CI/CD**: GitHub Actions (configurado en `.github/workflows/build.yml`)
+## Características Avanzadas
+- **Coroutines de Kotlin**: Para la gestión de operaciones asíncronas, como la captura de salida de procesos y la publicación de eventos.
+- **Serialización**: Se evaluarán formatos como Protobuf o JSON (con kotlinx.serialization) para la persistencia del estado y la comunicación entre componentes.
 
-## 3. Configuración del Entorno
-
-Para construir y ejecutar el proyecto, es necesario tener instalado un JDK (versión recomendada a completar) y utilizar el Gradle Wrapper (`./gradlew`) proporcionado.
-
-**Comandos clave:**
-
-- `build`: `./gradle build`
-- `test`: `./gradle test`
-- `run`: (A completar: Especificar cómo ejecutar los componentes `backend` y `worker`)
+## Análisis de Referencia
+El diseño se inspirará en el análisis de los siguientes DSLs y sistemas existentes:
+- Gradle Kotlin DSL (KTS)
+- Jetpack Compose
+- Jenkins Pipeline DSL (Declarative & Scripted)
+- TeamCity Pipelines DSL
+- GitLab CI Kotlin DSL (OpenSavvy)
