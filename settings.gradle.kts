@@ -21,5 +21,5 @@ include(
     ":worker:infrastructure",
     ":pipeline-dsl:core",
     ":pipeline-dsl:pipeline-cli",
-    ":pipeline-steps-library"
+    ":pipeline-dsl:pipeline-steps-library"
 )
