@@ -38,6 +38,35 @@ sealed class PipelineExecutionEvent {
     ) : PipelineExecutionEvent()
     
     @Serializable
+    data class StepStarted(
+        val pipelineName: String,
+        val stageName: String,
+        val stepType: String,
+        val stepId: String,
+        override val timestamp: Long = System.currentTimeMillis()
+    ) : PipelineExecutionEvent()
+    
+    @Serializable
+    data class StepCompleted(
+        val pipelineName: String,
+        val stageName: String,
+        val stepType: String,
+        val stepId: String,
+        val success: Boolean,
+        override val timestamp: Long = System.currentTimeMillis()
+    ) : PipelineExecutionEvent()
+    
+    @Serializable
+    data class StepFailed(
+        val pipelineName: String,
+        val stageName: String,
+        val stepType: String,
+        val stepId: String,
+        val error: String,
+        override val timestamp: Long = System.currentTimeMillis()
+    ) : PipelineExecutionEvent()
+    
+    @Serializable
     data class StepExecuted(
         val pipelineName: String,
         val stageName: String,

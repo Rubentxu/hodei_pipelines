@@ -129,7 +129,9 @@ object BasicStepExecutors {
             // Enviar evento de inicio
             context.publishEvent(
                 PipelineExecutionEvent.StepStarted(
-                    jobId = context.jobId,
+                    pipelineName = context.jobId,
+                    stageName = "echo",
+                    stepType = "echo",
                     stepId = step.id,
                     timestamp = System.currentTimeMillis()
                 )
@@ -141,10 +143,12 @@ object BasicStepExecutors {
             // Enviar evento de finalización
             context.publishEvent(
                 PipelineExecutionEvent.StepCompleted(
-                    jobId = context.jobId,
+                    pipelineName = context.jobId,
+                    stageName = "echo",
+                    stepType = "echo",
                     stepId = step.id,
-                    timestamp = System.currentTimeMillis(),
-                    duration = 0
+                    success = true,
+                    timestamp = System.currentTimeMillis()
                 )
             )
         }

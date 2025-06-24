@@ -195,10 +195,15 @@ class JobQueue(
             worker.capabilities.features.contains(feature)
         }
         
+        // Check if worker has required labels
+        val hasLabels = queuedJob.requirements.labels.all { (key, value) ->
+            worker.capabilities.matches(key, value)
+        }
+        
         // Check if worker meets resource requirements (simplified)
         val hasResources = true // Assume worker can handle the resources for now
         
-        return hasLanguages && hasTools && hasFeatures && hasResources && 
+        return hasLanguages && hasTools && hasFeatures && hasLabels && hasResources && 
                worker.status == dev.rubentxu.hodei.pipelines.domain.worker.WorkerStatus.READY
     }
     

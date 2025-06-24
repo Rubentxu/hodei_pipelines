@@ -115,8 +115,8 @@ class ChannelOutputStream(
                     isError = isError,
                     timestamp = System.currentTimeMillis()
                 )
-                // Usar tryOffer para no bloquear
-                channel.tryOffer(chunk)
+                // Usar trySend para no bloquear
+                channel.trySend(chunk)
                 buffer.clear()
             }
         }

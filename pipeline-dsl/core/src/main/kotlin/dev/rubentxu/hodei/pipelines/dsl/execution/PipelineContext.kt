@@ -59,7 +59,7 @@ class PipelineContext(
      */
     suspend fun executeCommand(
         command: List<String>,
-        timeout: kotlin.time.Duration = kotlin.time.Duration.minutes(30)
+        timeout: kotlin.time.Duration = kotlin.time.Duration.parse("PT30M")
     ): Int = commandExecutor.executeCommand(
         command = command,
         workingDirectory = workingDirectory,
@@ -75,7 +75,7 @@ class PipelineContext(
      */
     suspend fun sh(
         command: String,
-        timeout: kotlin.time.Duration = kotlin.time.Duration.minutes(30)
+        timeout: kotlin.time.Duration = kotlin.time.Duration.parse("PT30M")
     ): Int = commandExecutor.executeShell(
         command = command,
         workingDirectory = workingDirectory,
@@ -91,7 +91,7 @@ class PipelineContext(
      */
     suspend fun bat(
         command: String,
-        timeout: kotlin.time.Duration = kotlin.time.Duration.minutes(30)
+        timeout: kotlin.time.Duration = kotlin.time.Duration.parse("PT30M")
     ): Int = commandExecutor.executeBatch(
         command = command,
         workingDirectory = workingDirectory,

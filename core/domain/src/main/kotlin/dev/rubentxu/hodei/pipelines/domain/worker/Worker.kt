@@ -109,6 +109,11 @@ class CapabilitiesBuilder {
         capabilities["features"] = features.joinToString(",")
         return this
     }
+    
+    fun custom(key: String, value: String): CapabilitiesBuilder {
+        capabilities[key] = value
+        return this
+    }
 
     fun build(): WorkerCapabilities {
         return WorkerCapabilities(capabilities)

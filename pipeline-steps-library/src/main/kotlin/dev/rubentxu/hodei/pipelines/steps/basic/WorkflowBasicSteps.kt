@@ -7,7 +7,6 @@ import dev.rubentxu.hodei.pipelines.dsl.extensions.*
 import dev.rubentxu.hodei.pipelines.dsl.model.Step
 import dev.rubentxu.hodei.pipelines.dsl.builders.StepsBuilder
 import kotlinx.coroutines.delay
-import kotlinx.serialization.Serializable
 import mu.KotlinLogging
 import java.io.File
 import java.nio.charset.StandardCharsets

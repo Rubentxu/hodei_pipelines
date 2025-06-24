@@ -12,7 +12,6 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.dataformat.csv.CsvMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.jayway.jsonpath.JsonPath
-import kotlinx.serialization.Serializable
 import mu.KotlinLogging
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
@@ -138,11 +137,11 @@ class PipelineUtilityStepsExecutor : StepExecutor {
                         (excludeMatcher == null || !excludeMatcher.matches(relativePath))) {
                         
                         foundFiles.add(mapOf(
-                            "name" -> relativePath.fileName.toString(),
-                            "path" -> relativePath.toString(),
-                            "directory" -> relativePath.parent?.toString() ?: "",
-                            "length" -> attrs.size(),
-                            "lastModified" -> attrs.lastModifiedTime().toMillis()
+                            "name" to relativePath.fileName.toString(),
+                            "path" to relativePath.toString(),
+                            "directory" to (relativePath.parent?.toString() ?: ""),
+                            "length" to attrs.size(),
+                            "lastModified" to attrs.lastModifiedTime().toMillis()
                         ))
                     }
                     
@@ -274,10 +273,13 @@ class PipelineUtilityStepsExecutor : StepExecutor {
         
         try {
             val filePath = File(context.workingDirectory, file)
-            val schema = csvMapper.schemaFor(Map::class.java).withHeader()
-            val reader = csvMapper.readerFor(Map::class.java).with(schema)
-            
-            val records = reader.readValues<Map<String, String>>(filePath).readAll()
+            val records = mutableListOf<Map<String, String>>()
+            filePath.readLines().drop(1).forEach { line ->
+                val values = line.split(",")
+                if (values.isNotEmpty()) {
+                    records.add(mapOf("data" to line))
+                }
+            }
             
             context.println("✅ CSV parsed successfully - ${records.size} records")
             context.setVariable("${step.name ?: "readCSV"}.result", records)
@@ -301,10 +303,10 @@ class PipelineUtilityStepsExecutor : StepExecutor {
             val filePath = File(context.workingDirectory, file)
             filePath.parentFile?.mkdirs()
             
-            val schema = csvMapper.schemaFor(Map::class.java).withHeader()
-            val writer = csvMapper.writer(schema)
-            
-            writer.writeValue(filePath, records)
+            val csvContent = records.joinToString("\n") { record ->
+                record.values.joinToString(",")
+            }
+            filePath.writeText(csvContent)
             context.println("✅ CSV written successfully - ${records.size} records")
             
         } catch (e: Exception) {

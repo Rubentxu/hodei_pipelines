@@ -125,7 +125,9 @@ class CommandExecutor(
         // Enviar evento de inicio
         eventChannel.send(
             PipelineExecutionEvent.StepStarted(
-                jobId = jobId,
+                pipelineName = jobId,
+                stageName = "command",
+                stepType = "command",
                 stepId = stepId,
                 timestamp = startTime
             )
@@ -155,18 +157,21 @@ class CommandExecutor(
             eventChannel.send(
                 if (exitCode == 0) {
                     PipelineExecutionEvent.StepCompleted(
-                        jobId = jobId,
+                        pipelineName = jobId,
+                        stageName = "command",
+                        stepType = "command",
                         stepId = stepId,
-                        timestamp = System.currentTimeMillis(),
-                        duration = duration
+                        success = true,
+                        timestamp = System.currentTimeMillis()
                     )
                 } else {
                     PipelineExecutionEvent.StepFailed(
-                        jobId = jobId,
+                        pipelineName = jobId,
+                        stageName = "command",
+                        stepType = "command",
                         stepId = stepId,
-                        timestamp = System.currentTimeMillis(),
                         error = "Process exited with code $exitCode",
-                        duration = duration
+                        timestamp = System.currentTimeMillis()
                     )
                 }
             )
@@ -179,11 +184,12 @@ class CommandExecutor(
             // Enviar evento de error
             eventChannel.send(
                 PipelineExecutionEvent.StepFailed(
-                    jobId = jobId,
+                    pipelineName = jobId,
+                    stageName = "command",
+                    stepType = "command",
                     stepId = stepId,
-                    timestamp = System.currentTimeMillis(),
                     error = e.message ?: "Unknown error",
-                    duration = System.currentTimeMillis() - startTime
+                    timestamp = System.currentTimeMillis()
                 )
             )
             

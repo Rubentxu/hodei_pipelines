@@ -175,13 +175,16 @@ class ExtensionRegistry(
         logger.info { "Installing extension: $groupId:$artifactId:$version" }
         
         try {
-            // Descargar JAR usando LibraryManager
-            libraryManager.downloadArtifact(groupId, artifactId, version, repository)
+            // NOTE: Artifact download functionality not implemented in current LibraryManager
+            // Extensions should be pre-installed or loaded via addArtifactLibrary
+            logger.warn { "Artifact download not implemented. Extension must be pre-installed: $groupId:$artifactId:$version" }
             
-            // Cargar extensiones del JAR descargado
+            // Try to find locally installed JAR
             val jarFile = File("lib", "$artifactId-$version.jar")
             if (jarFile.exists()) {
                 loadExtensionsFromJar(jarFile)
+            } else {
+                throw IllegalStateException("Extension JAR not found locally: ${jarFile.absolutePath}")
             }
             
         } catch (e: Exception) {

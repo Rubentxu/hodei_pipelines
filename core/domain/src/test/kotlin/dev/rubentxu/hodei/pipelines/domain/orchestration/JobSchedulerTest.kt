@@ -39,10 +39,9 @@ class JobSchedulerTest {
             .arch("x86_64")
             .maxConcurrentJobs(5)
         
+        // Add custom capabilities
         capabilities.forEach { (key, value) ->
-            if (key == "test" && value == "true") {
-                capabilitiesBuilder.label("test")
-            }
+            capabilitiesBuilder.custom(key, value)
         }
         
         return Worker(
@@ -55,7 +54,8 @@ class JobSchedulerTest {
     
     private fun createTestRequirements(capabilities: Map<String, String> = mapOf("test" to "true")): WorkerRequirements {
         return WorkerRequirements(
-            resources = ResourceRequirements(cpu = "500m", memory = "1Gi")
+            resources = ResourceRequirements(cpu = "500m", memory = "1Gi"),
+            labels = capabilities
         )
     }
     

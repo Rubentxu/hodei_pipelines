@@ -12,7 +12,6 @@ import dev.rubentxu.hodei.pipelines.dsl.extensions.ExtensionStep
 /**
  * Find files matching glob pattern.
  */
-@PipelineDslMarker
 fun StepsBuilder.findFiles(
     glob: String = "**/*",
     excludes: String? = null
@@ -35,7 +34,6 @@ fun StepsBuilder.findFiles(
 /**
  * Read JSON from file or text.
  */
-@PipelineDslMarker
 fun StepsBuilder.readJSON(file: String): String {
     val stepName = "readJSON-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -49,7 +47,6 @@ fun StepsBuilder.readJSON(file: String): String {
     return stepName
 }
 
-@PipelineDslMarker
 fun StepsBuilder.readJSON(text: String, fromText: Boolean): String {
     val stepName = "readJSON-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -66,7 +63,6 @@ fun StepsBuilder.readJSON(text: String, fromText: Boolean): String {
 /**
  * Write JSON to file.
  */
-@PipelineDslMarker
 fun StepsBuilder.writeJSON(
     file: String,
     json: Any,
@@ -88,7 +84,6 @@ fun StepsBuilder.writeJSON(
 /**
  * Read YAML from file or text.
  */
-@PipelineDslMarker
 fun StepsBuilder.readYaml(file: String): String {
     val stepName = "readYaml-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -102,7 +97,6 @@ fun StepsBuilder.readYaml(file: String): String {
     return stepName
 }
 
-@PipelineDslMarker
 fun StepsBuilder.readYaml(text: String, fromText: Boolean): String {
     val stepName = "readYaml-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -119,7 +113,6 @@ fun StepsBuilder.readYaml(text: String, fromText: Boolean): String {
 /**
  * Write YAML to file.
  */
-@PipelineDslMarker
 fun StepsBuilder.writeYaml(
     file: String,
     data: Any
@@ -139,7 +132,6 @@ fun StepsBuilder.writeYaml(
 /**
  * Read CSV file.
  */
-@PipelineDslMarker
 fun StepsBuilder.readCSV(
     file: String,
     format: String = "DEFAULT"
@@ -162,7 +154,6 @@ fun StepsBuilder.readCSV(
 /**
  * Write CSV file.
  */
-@PipelineDslMarker
 fun StepsBuilder.writeCSV(
     file: String,
     records: List<Map<String, Any>>,
@@ -184,7 +175,6 @@ fun StepsBuilder.writeCSV(
 /**
  * Read manifest file.
  */
-@PipelineDslMarker
 fun StepsBuilder.readManifest(file: String = "META-INF/MANIFEST.MF"): String {
     val stepName = "readManifest-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -201,7 +191,6 @@ fun StepsBuilder.readManifest(file: String = "META-INF/MANIFEST.MF"): String {
 /**
  * Read properties file or text.
  */
-@PipelineDslMarker
 fun StepsBuilder.readProperties(
     file: String,
     defaults: Map<String, String>? = null,
@@ -223,7 +212,6 @@ fun StepsBuilder.readProperties(
     return stepName
 }
 
-@PipelineDslMarker
 fun StepsBuilder.readProperties(
     text: String,
     fromText: Boolean,
@@ -249,7 +237,6 @@ fun StepsBuilder.readProperties(
 /**
  * Write properties file.
  */
-@PipelineDslMarker
 fun StepsBuilder.writeProperties(
     file: String,
     properties: Map<String, String>,
@@ -271,7 +258,6 @@ fun StepsBuilder.writeProperties(
 /**
  * Create ZIP archive.
  */
-@PipelineDslMarker
 fun StepsBuilder.zip(
     zipFile: String,
     glob: String = "**/*",
@@ -295,7 +281,6 @@ fun StepsBuilder.zip(
 /**
  * Extract ZIP archive.
  */
-@PipelineDslMarker
 fun StepsBuilder.unzip(
     zipFile: String,
     dir: String? = null,
@@ -326,7 +311,6 @@ fun StepsBuilder.unzip(
 /**
  * Create TAR archive.
  */
-@PipelineDslMarker
 fun StepsBuilder.tar(
     file: String,
     glob: String = "**/*",
@@ -352,7 +336,6 @@ fun StepsBuilder.tar(
 /**
  * Extract TAR archive.
  */
-@PipelineDslMarker
 fun StepsBuilder.untar(
     file: String,
     dir: String? = null,
@@ -379,7 +362,6 @@ fun StepsBuilder.untar(
 /**
  * Base64 encode data.
  */
-@PipelineDslMarker
 fun StepsBuilder.base64Encode(file: String): String {
     val stepName = "base64Encode-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -393,7 +375,6 @@ fun StepsBuilder.base64Encode(file: String): String {
     return stepName
 }
 
-@PipelineDslMarker
 fun StepsBuilder.base64Encode(text: String, fromText: Boolean): String {
     val stepName = "base64Encode-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -410,7 +391,6 @@ fun StepsBuilder.base64Encode(text: String, fromText: Boolean): String {
 /**
  * Base64 decode data.
  */
-@PipelineDslMarker
 fun StepsBuilder.base64Decode(
     data: String,
     file: String? = null
@@ -433,7 +413,6 @@ fun StepsBuilder.base64Decode(
 /**
  * Calculate SHA1 hash.
  */
-@PipelineDslMarker
 fun StepsBuilder.sha1(file: String): String {
     val stepName = "sha1-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -447,7 +426,6 @@ fun StepsBuilder.sha1(file: String): String {
     return stepName
 }
 
-@PipelineDslMarker
 fun StepsBuilder.sha1(text: String, fromText: Boolean): String {
     val stepName = "sha1-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -464,7 +442,6 @@ fun StepsBuilder.sha1(text: String, fromText: Boolean): String {
 /**
  * Calculate SHA256 hash.
  */
-@PipelineDslMarker
 fun StepsBuilder.sha256(file: String): String {
     val stepName = "sha256-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -478,7 +455,6 @@ fun StepsBuilder.sha256(file: String): String {
     return stepName
 }
 
-@PipelineDslMarker
 fun StepsBuilder.sha256(text: String, fromText: Boolean): String {
     val stepName = "sha256-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -495,7 +471,6 @@ fun StepsBuilder.sha256(text: String, fromText: Boolean): String {
 /**
  * Calculate MD5 hash.
  */
-@PipelineDslMarker
 fun StepsBuilder.md5(file: String): String {
     val stepName = "md5-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -509,7 +484,6 @@ fun StepsBuilder.md5(file: String): String {
     return stepName
 }
 
-@PipelineDslMarker
 fun StepsBuilder.md5(text: String, fromText: Boolean): String {
     val stepName = "md5-${System.currentTimeMillis()}"
     addExtensionStep(
@@ -526,7 +500,6 @@ fun StepsBuilder.md5(text: String, fromText: Boolean): String {
 /**
  * Make HTTP request.
  */
-@PipelineDslMarker
 fun StepsBuilder.httpRequest(
     url: String,
     httpMode: String = "GET",
@@ -559,7 +532,6 @@ fun StepsBuilder.httpRequest(
 /**
  * HTTP request with DSL configuration.
  */
-@PipelineDslMarker
 inline fun StepsBuilder.httpRequest(
     url: String,
     block: HttpRequestBuilder.() -> Unit
@@ -569,7 +541,6 @@ inline fun StepsBuilder.httpRequest(
     return builder.addToSteps(this)
 }
 
-@PipelineDslMarker
 class HttpRequestBuilder(private val url: String) {
     var httpMode: String = "GET"
     var acceptType: String = "APPLICATION_JSON"
@@ -597,7 +568,7 @@ class HttpRequestBuilder(private val url: String) {
         authentication = credentials
     }
     
-    internal fun addToSteps(stepsBuilder: StepsBuilder): String {
+    fun addToSteps(stepsBuilder: StepsBuilder): String {
         return stepsBuilder.httpRequest(
             url = url,
             httpMode = httpMode,
@@ -613,7 +584,6 @@ class HttpRequestBuilder(private val url: String) {
 /**
  * Compare version strings.
  */
-@PipelineDslMarker
 fun StepsBuilder.compareVersions(
     v1: String,
     v2: String,
@@ -638,7 +608,6 @@ fun StepsBuilder.compareVersions(
 /**
  * Get nodes by label.
  */
-@PipelineDslMarker
 fun StepsBuilder.nodesByLabel(
     label: String,
     offline: Boolean = false
@@ -661,7 +630,6 @@ fun StepsBuilder.nodesByLabel(
 /**
  * Load library resource.
  */
-@PipelineDslMarker
 fun StepsBuilder.libraryResource(
     resource: String,
     encoding: String = "UTF-8"
@@ -684,7 +652,6 @@ fun StepsBuilder.libraryResource(
 /**
  * Touch file (create or update timestamp).
  */
-@PipelineDslMarker
 fun StepsBuilder.touch(
     file: String,
     timestamp: Long? = null
@@ -704,7 +671,6 @@ fun StepsBuilder.touch(
 /**
  * Read trusted file.
  */
-@PipelineDslMarker
 fun StepsBuilder.readTrusted(
     file: String,
     encoding: String = "UTF-8"
@@ -727,7 +693,6 @@ fun StepsBuilder.readTrusted(
 /**
  * Write trusted file.
  */
-@PipelineDslMarker
 fun StepsBuilder.writeTrusted(
     file: String,
     text: String,
@@ -746,12 +711,4 @@ fun StepsBuilder.writeTrusted(
     )
 }
 
-// Helper function para agregar extension steps
-private fun StepsBuilder.addExtensionStep(step: ExtensionStep) {
-    // Usar reflexión para agregar el step a la lista interna
-    val stepsField = this::class.java.getDeclaredField("steps")
-    stepsField.isAccessible = true
-    @Suppress("UNCHECKED_CAST")
-    val steps = stepsField.get(this) as MutableList<dev.rubentxu.hodei.pipelines.dsl.model.Step>
-    steps.add(step)
-}
+

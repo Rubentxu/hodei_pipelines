@@ -7,6 +7,7 @@ import dev.rubentxu.hodei.pipelines.dsl.execution.StepExecutor
 import dev.rubentxu.hodei.pipelines.dsl.execution.steps.StepCategory
 import dev.rubentxu.hodei.pipelines.dsl.model.Step
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Contextual
 import kotlin.reflect.KClass
 
 /**
@@ -75,12 +76,15 @@ data class Dependency(
 data class ExtensionStep(
     val extensionName: String,
     val action: String,
-    val parameters: Map<String, Any> = emptyMap(),
-    override val name: String? = null,
-    override val continueOnError: Boolean = false,
-    override val timeout: Int? = null
-) : Step() {
-    override val stepType: String get() = extensionName
+    val parameters: Map<String, @Contextual Any> = emptyMap(),
+    val name: String? = null,
+    val continueOnError: Boolean = false,
+    val timeout: Int? = null
+) {
+    // ExtensionStep is not a Step subclass but contains similar properties
+    val stepType: String get() = extensionName
+    val id: String get() = name ?: "$extensionName-$action-${hashCode()}"
+    val ignoreErrors: Boolean get() = continueOnError
 }
 
 /**
@@ -148,5 +152,13 @@ private fun StepsBuilder.addExtensionStep(step: ExtensionStep) {
     stepsField.isAccessible = true
     @Suppress("UNCHECKED_CAST")
     val steps = stepsField.get(this) as MutableList<Step>
-    steps.add(step)
+    // Convert ExtensionStep to Step.Custom
+    val customStep = Step.Custom(
+        action = step.extensionName,
+        parameters = step.parameters.mapValues { it.value.toString() },
+        name = step.name,
+        continueOnError = step.continueOnError,
+        timeout = step.timeout
+    )
+    steps.add(customStep)
 }
