@@ -73,14 +73,13 @@ class StepExecutorRegistry {
         stepTypeMapping[Step.Shell::class] = "sh"
         stepTypeMapping[Step.Batch::class] = "bat"
         stepTypeMapping[Step.Echo::class] = "echo"
-        stepTypeMapping[Step.ArchiveArtifacts::class] = "archiveArtifacts"
-        stepTypeMapping[Step.PublishTestResults::class] = "publishTestResults"
-        stepTypeMapping[Step.Checkout::class] = "checkout"
         stepTypeMapping[Step.Script::class] = "script"
-        stepTypeMapping[Step.Docker::class] = "docker"
-        stepTypeMapping[Step.Notification::class] = "notification"
-        stepTypeMapping[Step.Dir::class] = "dir"
-        stepTypeMapping[Step.WithEnv::class] = "withEnv"
+        // NOTE: Specialized step mappings moved to dedicated extensions:
+        // - ArchiveArtifacts, PublishTestResults, Checkout -> jenkins-pipeline-steps, scm-steps
+        // - Docker -> docker-steps extension
+        // - Notification -> notification-steps extension
+        // NOTE: Dir, WithEnv, Timeout, Retry, Parallel step mappings removed
+        // These are now handled by pipeline-steps-library extension
         stepTypeMapping[Step.Custom::class] = "custom"
     }
 }
