@@ -1,7 +1,6 @@
 package dev.rubentxu.hodei.pipelines.dsl.orchestration
 
 import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineEngine
-import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineRunner
 import dev.rubentxu.hodei.pipelines.dsl.execution.StepExecutorManager
 import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineStepExecutorManager
 import dev.rubentxu.hodei.pipelines.dsl.model.Pipeline
@@ -27,7 +26,6 @@ class PipelineOrchestrator(
 ) {
     
     private val pipelineEngine = PipelineEngine(stepExecutorManager)
-    private val pipelineRunner = PipelineRunner()
     
     init {
         logger.info { "Pipeline DSL Orchestrator initialized" }
@@ -61,13 +59,6 @@ class PipelineOrchestrator(
                 )
             )
         )
-    }
-    
-    /**
-     * Ejecuta un pipeline compilado.
-     */
-    fun getRunner(): PipelineRunner {
-        return pipelineRunner
     }
     
     /**

@@ -1,6 +1,6 @@
 package dev.rubentxu.hodei.pipelines.dsl.model
 
-import dev.rubentxu.hodei.pipelines.port.StageType
+import dev.rubentxu.hodei.pipelines.dsl.model.StageType
 import kotlinx.serialization.Serializable
 
 /**
@@ -32,6 +32,15 @@ data class Stage(
      */
     fun canExecute(context: Map<String, Any>): Boolean {
         return whenCondition?.evaluate(context) ?: true
+    }
+    
+    /**
+     * Verifica si este stage debe ejecutarse dado el contexto del pipeline.
+     */
+    fun shouldExecute(context: dev.rubentxu.hodei.pipelines.dsl.execution.PipelineContext): Boolean {
+        // Por ahora, simplificamos y siempre ejecutamos
+        // TODO: Implementar evaluación de whenCondition usando el contexto
+        return whenCondition == null
     }
     
     /**

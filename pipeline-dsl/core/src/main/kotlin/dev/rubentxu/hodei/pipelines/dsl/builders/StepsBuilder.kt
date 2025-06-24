@@ -15,73 +15,105 @@ class StepsBuilder {
     
     /**
      * Ejecuta un comando shell.
+     * Compatible con Jenkins Pipeline DSL.
      */
-    fun sh(
-        command: String,
-        name: String? = null,
-        continueOnError: Boolean = false,
-        timeout: Int? = null,
-        workingDirectory: String? = null,
-        returnStdout: Boolean = false,
-        returnStatus: Boolean = false,
-        encoding: String = "UTF-8"
-    ) {
+    fun sh(script: String) {
         steps.add(
             Step.Shell(
-                command = command,
-                name = name,
-                continueOnError = continueOnError,
-                timeout = timeout,
-                workingDirectory = workingDirectory,
+                command = script,
+                name = null,
+                continueOnError = false,
+                timeout = null,
+                workingDirectory = null,
+                returnStdout = false,
+                returnStatus = false,
+                encoding = "UTF-8"
+            )
+        )
+    }
+    
+    /**
+     * Ejecuta un comando shell con parámetros.
+     * Compatible con Jenkins Pipeline DSL.
+     */
+    fun sh(
+        script: String? = null,
+        returnStdout: Boolean = false,
+        returnStatus: Boolean = false,
+        encoding: String? = null,
+        label: String? = null
+    ) {
+        requireNotNull(script) { "Script parameter is required" }
+        steps.add(
+            Step.Shell(
+                command = script,
+                name = label,
+                continueOnError = returnStatus,
+                timeout = null,
+                workingDirectory = null,
                 returnStdout = returnStdout,
                 returnStatus = returnStatus,
-                encoding = encoding
+                encoding = encoding ?: "UTF-8"
             )
         )
     }
     
     /**
      * Ejecuta un comando batch (Windows).
+     * Compatible con Jenkins Pipeline DSL.
      */
-    fun bat(
-        command: String,
-        name: String? = null,
-        continueOnError: Boolean = false,
-        timeout: Int? = null,
-        workingDirectory: String? = null,
-        returnStdout: Boolean = false,
-        returnStatus: Boolean = false,
-        encoding: String = "UTF-8"
-    ) {
+    fun bat(script: String) {
         steps.add(
             Step.Batch(
-                command = command,
-                name = name,
-                continueOnError = continueOnError,
-                timeout = timeout,
-                workingDirectory = workingDirectory,
+                command = script,
+                name = null,
+                continueOnError = false,
+                timeout = null,
+                workingDirectory = null,
+                returnStdout = false,
+                returnStatus = false,
+                encoding = "UTF-8"
+            )
+        )
+    }
+    
+    /**
+     * Ejecuta un comando batch con parámetros.
+     * Compatible con Jenkins Pipeline DSL.
+     */
+    fun bat(
+        script: String? = null,
+        returnStdout: Boolean = false,
+        returnStatus: Boolean = false,
+        encoding: String? = null,
+        label: String? = null
+    ) {
+        requireNotNull(script) { "Script parameter is required" }
+        steps.add(
+            Step.Batch(
+                command = script,
+                name = label,
+                continueOnError = returnStatus,
+                timeout = null,
+                workingDirectory = null,
                 returnStdout = returnStdout,
                 returnStatus = returnStatus,
-                encoding = encoding
+                encoding = encoding ?: "UTF-8"
             )
         )
     }
     
     /**
      * Muestra un mensaje.
+     * Compatible con Jenkins Pipeline DSL.
      */
-    fun echo(
-        message: String,
-        name: String? = null,
-        continueOnError: Boolean = false,
-        timeout: Int? = null
-    ) {
+    fun echo(message: String) {
         steps.add(
             Step.Echo(
                 message = message,
-                name = name,
-                continueOnError = continueOnError,
-                timeout = timeout
+                name = null,
+                continueOnError = false,
+                timeout = null
             )
         )
     }
@@ -293,6 +325,65 @@ class StepsBuilder {
                 timeout = timeout
             )
         )
+    }
+    
+    /**
+     * Step de timeout compatible con Jenkins.
+     */
+    fun timeout(time: Int, unit: TimeUnit = TimeUnit.MINUTES, block: StepsBuilder.() -> Unit) {
+        val builder = StepsBuilder()
+        builder.block()
+        steps.add(
+            Step.Timeout(
+                time = time,
+                unit = unit,
+                steps = builder.build()
+            )
+        )
+    }
+    
+    /**
+     * Step de retry compatible con Jenkins.
+     */
+    fun retry(count: Int, block: StepsBuilder.() -> Unit) {
+        val builder = StepsBuilder()
+        builder.block()
+        steps.add(
+            Step.Retry(
+                count = count,
+                steps = builder.build()
+            )
+        )
+    }
+    
+    /**
+     * Step de ejecución paralela compatible con Jenkins.
+     */
+    fun parallel(branches: Map<String, () -> Unit>) {
+        val parallelBranches = mutableMapOf<String, List<Step>>()
+        
+        branches.forEach { (name, block) ->
+            val builder = StepsBuilder()
+            // Ejecutar el bloque en el contexto del builder
+            block.invoke()
+            parallelBranches[name] = builder.build()
+        }
+        
+        steps.add(
+            Step.Parallel(
+                branches = parallelBranches,
+                failFast = true
+            )
+        )
+    }
+    
+    /**
+     * Step de ejecución paralela con DSL.
+     */
+    fun parallel(failFast: Boolean = true, block: ParallelBuilder.() -> Unit) {
+        val builder = ParallelBuilder(failFast)
+        builder.block()
+        steps.add(builder.build())
     }
     
     /**

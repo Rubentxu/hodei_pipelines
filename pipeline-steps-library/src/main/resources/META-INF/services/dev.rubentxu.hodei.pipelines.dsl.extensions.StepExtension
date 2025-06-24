@@ -1,0 +1,3 @@
+dev.rubentxu.hodei.pipelines.steps.basic.WorkflowBasicStepsExtension
+dev.rubentxu.hodei.pipelines.steps.utility.PipelineUtilityStepsExtension
+dev.rubentxu.hodei.pipelines.steps.registration.StepsLibraryExtension

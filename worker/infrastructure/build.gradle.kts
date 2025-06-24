@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":worker:domain"))
     implementation(project(":worker:application"))
     implementation(project(":core:infrastructure"))
+    implementation(project(":pipeline-dsl:core"))
 
     implementation(libs.grpc.netty.shaded)
     implementation(libs.kotlin.scripting.jvm)

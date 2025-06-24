@@ -5,10 +5,7 @@ plugins {
 }
 
 dependencies {
-    // Core domain para eventos y modelos básicos
-    api(project(":core:domain"))
-    
-    // Pipeline DSL is now standalone - removed worker:domain dependency
+    // Pipeline DSL standalone - minimal dependencies
     
     // Kotlin Core
     implementation(libs.kotlin.stdlib)

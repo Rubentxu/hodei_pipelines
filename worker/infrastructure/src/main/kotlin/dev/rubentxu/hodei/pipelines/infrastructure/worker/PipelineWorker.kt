@@ -2,7 +2,7 @@ package dev.rubentxu.hodei.pipelines.infrastructure.worker
 
 import com.google.protobuf.ByteString
 import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
-import dev.rubentxu.hodei.pipelines.infrastructure.script.PipelineScriptExecutor
+import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineEngine
 import dev.rubentxu.hodei.pipelines.port.JobExecutionEvent
 import dev.rubentxu.hodei.pipelines.proto.*
 import dev.rubentxu.hodei.pipelines.proto.JobExecutorServiceGrpcKt.JobExecutorServiceCoroutineStub
@@ -54,7 +54,7 @@ class PipelineWorker(
     private val workerName: String,
     private val serverHost: String,
     private val serverPort: Int,
-    private val scriptExecutor: PipelineScriptExecutor
+    private val scriptExecutor: PipelineEngine
 ) : Closeable {
 
     private val channel: ManagedChannel = ManagedChannelBuilder.forAddress(serverHost, serverPort)

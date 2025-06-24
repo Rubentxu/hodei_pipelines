@@ -55,7 +55,6 @@ class JobSchedulerTest {
     
     private fun createTestRequirements(capabilities: Map<String, String> = mapOf("test" to "true")): WorkerRequirements {
         return WorkerRequirements(
-            capabilities = capabilities,
             resources = ResourceRequirements(cpu = "500m", memory = "1Gi")
         )
     }

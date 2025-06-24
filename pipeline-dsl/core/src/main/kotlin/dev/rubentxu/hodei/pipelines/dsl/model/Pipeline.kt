@@ -1,17 +1,12 @@
 package dev.rubentxu.hodei.pipelines.dsl.model
 
-import dev.rubentxu.hodei.pipelines.domain.job.JobId
-import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
 import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineContext
-import dev.rubentxu.hodei.pipelines.port.JobExecutionEvent
-import dev.rubentxu.hodei.pipelines.port.JobOutputChunk
 import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.Serializable
-import java.time.Instant
 
 /**
  * Modelo central del Pipeline que integra con el sistema de workers existente.
- * 
+ *
  * Esta clase une el DSL tipado con la funcionalidad avanzada de ejecución
  * del sistema de workers, manteniendo la compatibilidad con eventos y output streams.
  */
@@ -27,52 +22,52 @@ data class Pipeline(
     val parameters: Map<String, Parameter> = emptyMap(),
     val options: PipelineOptions = PipelineOptions()
 ) {
-    
+
     /**
      * Crea un contexto de ejecución integrado con el sistema de workers existente.
      */
     fun createExecutionContext(
-        jobId: JobId,
-        workerId: WorkerId,
-        outputChannel: Channel<JobOutputChunk>,
-        eventChannel: Channel<JobExecutionEvent>,
+        jobId: String,
+        workerId: String,
+        outputChannel: Channel<PipelineOutputChunk>,
+        eventChannel: Channel<PipelineExecutionEvent>,
         runtimeEnvironment: Map<String, String> = emptyMap()
     ): PipelineContext {
         val mergedEnvironment = environment + runtimeEnvironment
-        
+
         return PipelineContext(
             jobId = jobId,
             workerId = workerId,
-            environment = mergedEnvironment,
+            environment = mergedEnvironment.toMutableMap(),
             outputChannel = outputChannel,
             eventChannel = eventChannel
         )
     }
-    
+
     /**
      * Valida dependencias de artifacts entre stages.
      */
     fun validateArtifactDependencies(): List<String> {
         val producedArtifacts = getAllProducedArtifacts()
         val requiredArtifacts = getAllRequiredArtifacts()
-        
+
         return (requiredArtifacts - producedArtifacts).toList()
     }
-    
+
     /**
      * Obtiene todos los artifacts producidos por el pipeline.
      */
     fun getAllProducedArtifacts(): Set<String> {
         return stages.flatMap { it.produces }.toSet()
     }
-    
+
     /**
      * Obtiene todos los artifacts requeridos por el pipeline.
      */
     fun getAllRequiredArtifacts(): Set<String> {
         return stages.flatMap { it.requires }.toSet()
     }
-    
+
     /**
      * Obtiene el número total de steps en todo el pipeline.
      */
@@ -174,13 +169,13 @@ enum class ParameterType {
 sealed class Trigger {
     @Serializable
     data class Cron(val expression: String) : Trigger()
-    
+
     @Serializable
     data class SCM(val pollSCM: String) : Trigger()
-    
+
     @Serializable
     data class Upstream(
-        val projects: List<String>, 
+        val projects: List<String>,
         val threshold: String = "SUCCESS"
     ) : Trigger()
 }

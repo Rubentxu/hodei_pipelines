@@ -1,7 +1,8 @@
 package dev.rubentxu.hodei.pipelines.dsl.model
 
-import dev.rubentxu.hodei.pipelines.domain.worker.model.dsl.ParameterType
+// Standalone Pipeline DSL - no worker dependencies
 import kotlinx.serialization.Serializable
+import dev.rubentxu.hodei.pipelines.dsl.model.TimeUnit
 
 /**
  * Definición de un Step en el Pipeline DSL.
@@ -14,6 +15,28 @@ sealed class Step {
     abstract val name: String?
     abstract val continueOnError: Boolean
     abstract val timeout: Int? // en segundos
+    
+    /**
+     * Tipo de step para identificar el ejecutor apropiado.
+     */
+    val stepType: String
+        get() = when (this) {
+            is Shell -> "sh"
+            is Batch -> "bat"
+            is Echo -> "echo"
+            is ArchiveArtifacts -> "archiveArtifacts"
+            is PublishTestResults -> "publishTestResults"
+            is Checkout -> "checkout"
+            is Script -> "script"
+            is Docker -> "docker"
+            is Notification -> "notification"
+            is Dir -> "dir"
+            is WithEnv -> "withEnv"
+            is Timeout -> "timeout"
+            is Retry -> "retry"
+            is Parallel -> "parallel"
+            is Custom -> action
+        }
     
     /**
      * Step para ejecutar comandos shell.
@@ -169,6 +192,43 @@ sealed class Step {
     ) : Step()
     
     /**
+     * Step para timeout compatible con Jenkins.
+     */
+    @Serializable
+    data class Timeout(
+        val time: Int,
+        val unit: TimeUnit = TimeUnit.MINUTES,
+        val steps: List<Step>,
+        override val name: String? = null,
+        override val continueOnError: Boolean = false,
+        override val timeout: Int? = null
+    ) : Step()
+    
+    /**
+     * Step para retry compatible con Jenkins.
+     */
+    @Serializable
+    data class Retry(
+        val count: Int,
+        val steps: List<Step>,
+        override val name: String? = null,
+        override val continueOnError: Boolean = false,
+        override val timeout: Int? = null
+    ) : Step()
+    
+    /**
+     * Step para ejecución paralela compatible con Jenkins.
+     */
+    @Serializable
+    data class Parallel(
+        val branches: Map<String, List<Step>>,
+        val failFast: Boolean = true,
+        override val name: String? = null,
+        override val continueOnError: Boolean = false,
+        override val timeout: Int? = null
+    ) : Step()
+    
+    /**
      * Step personalizado que puede ser extendido.
      */
     @Serializable
@@ -179,6 +239,18 @@ sealed class Step {
         override val continueOnError: Boolean = false,
         override val timeout: Int? = null
     ) : Step()
+    
+    /**
+     * ID único del step para tracking.
+     */
+    val id: String
+        get() = name ?: "${stepType}-${hashCode()}"
+    
+    /**
+     * Indica si el step debe ignorar errores (alias de continueOnError).
+     */
+    val ignoreErrors: Boolean
+        get() = continueOnError
 }
 
 /**
@@ -249,21 +321,3 @@ sealed class NotificationChannel {
     ) : NotificationChannel()
 }
 
-/**
- * Extensión para obtener el tipo de step como string.
- */
-val Step.stepType: String
-    get() = when (this) {
-        is Step.Shell -> "sh"
-        is Step.Batch -> "bat"
-        is Step.Echo -> "echo"
-        is Step.ArchiveArtifacts -> "archiveArtifacts"
-        is Step.PublishTestResults -> "publishTestResults"
-        is Step.Checkout -> "checkout"
-        is Step.Script -> "script"
-        is Step.Docker -> "docker"
-        is Step.Notification -> "notification"
-        is Step.Dir -> "dir"
-        is Step.WithEnv -> "withEnv"
-        is Step.Custom -> action
-    }

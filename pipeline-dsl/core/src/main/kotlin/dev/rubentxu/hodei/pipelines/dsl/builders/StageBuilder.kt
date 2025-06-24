@@ -2,7 +2,7 @@ package dev.rubentxu.hodei.pipelines.dsl.builders
 
 import dev.rubentxu.hodei.pipelines.dsl.PipelineDslMarker
 import dev.rubentxu.hodei.pipelines.dsl.model.*
-import dev.rubentxu.hodei.pipelines.port.StageType
+import dev.rubentxu.hodei.pipelines.dsl.model.StageType
 
 /**
  * Builder para la colección de stages del pipeline.

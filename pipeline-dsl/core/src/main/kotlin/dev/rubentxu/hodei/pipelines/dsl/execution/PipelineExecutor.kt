@@ -1,10 +1,7 @@
 package dev.rubentxu.hodei.pipelines.dsl.execution
 
-import dev.rubentxu.hodei.pipelines.domain.job.JobId
-import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
 import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineContext
 import dev.rubentxu.hodei.pipelines.dsl.model.*
-import dev.rubentxu.hodei.pipelines.port.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import mu.KotlinLogging
@@ -30,17 +27,17 @@ class PipelineEngine(
      */
     suspend fun execute(
         pipeline: Pipeline,
-        jobId: JobId,
-        workerId: WorkerId,
-        outputChannel: Channel<JobOutputChunk>,
-        eventChannel: Channel<JobExecutionEvent>,
+        jobId: String,
+        workerId: String,
+        outputChannel: Channel<PipelineOutputChunk>,
+        eventChannel: Channel<PipelineExecutionEvent>,
         runtimeEnvironment: Map<String, String> = emptyMap()
     ): PipelineExecutionResult = coroutineScope {
         
         // Crear contexto de ejecución standalone del Pipeline DSL
         val context = PipelineContext(
-            jobId = jobId.value,
-            workerId = workerId.value,
+            jobId = jobId,
+            workerId = workerId,
             workingDirectory = java.io.File(System.getProperty("user.dir")),
             environment = (pipeline.environment + runtimeEnvironment).toMutableMap(),
             outputChannel = outputChannel,
@@ -54,14 +51,14 @@ class PipelineEngine(
             logger.info { "Starting pipeline execution: ${pipeline.name}" }
             
             // Enviar evento de inicio
-            eventChannel.send(PipelineEvent.StatusUpdate(
+            eventChannel.send(PipelineExecutionEvent.StatusUpdate(
                 jobId = jobId,
                 status = "STARTED",
                 message = "Pipeline execution started: ${pipeline.name}"
             ))
             
             // Preparar entorno
-            eventChannel.send(PipelineEvent.EnvironmentPrepared(
+            eventChannel.send(PipelineExecutionEvent.EnvironmentPrepared(
                 jobId = jobId,
                 environment = pipeline.environment + runtimeEnvironment,
                 workingDirectory = System.getProperty("user.dir")
@@ -79,7 +76,7 @@ class PipelineEngine(
             for (stage in pipeline.stages) {
                 if (!stage.shouldExecute(context)) {
                     logger.info { "Skipping stage '${stage.name}' due to when condition" }
-                    eventChannel.send(PipelineEvent.StageSkipped(
+                    eventChannel.send(PipelineExecutionEvent.StageSkipped(
                         jobId = jobId,
                         stageName = stage.name,
                         reason = "When condition not met"
@@ -111,7 +108,7 @@ class PipelineEngine(
             val duration = System.currentTimeMillis() - startTime
             logger.info { "Pipeline execution completed successfully in ${duration}ms" }
             
-            eventChannel.send(PipelineEvent.StatusUpdate(
+            eventChannel.send(PipelineExecutionEvent.StatusUpdate(
                 jobId = jobId,
                 status = "SUCCESS",
                 message = "Pipeline execution completed successfully"
@@ -129,7 +126,7 @@ class PipelineEngine(
             // Ejecutar post failure
             executePostActions(pipeline.post?.failure ?: emptyList(), context)
             
-            eventChannel.send(PipelineEvent.StatusUpdate(
+            eventChannel.send(PipelineExecutionEvent.StatusUpdate(
                 jobId = jobId,
                 status = "FAILED",
                 message = "Pipeline execution failed: ${e.message}"
@@ -163,32 +160,38 @@ class PipelineEngine(
         val startTime = System.currentTimeMillis()
         
         try {
-            // Usar el stage function del PipelineContext existente
-            context.stage(stage.name, stage.type) {
-                
-                // Ejecutar steps secuenciales
-                if (stage.steps.isNotEmpty()) {
-                    steps {
-                        for (step in stage.steps) {
+            // Enviar evento de inicio de stage
+            context.publishEvent(PipelineExecutionEvent.StageStarted(
+                pipelineName = "pipeline", // TODO: get from context
+                stageName = stage.name
+            ))
+            
+            // Ejecutar steps secuenciales
+            for (step in stage.steps) {
+                executeStep(step, context)
+            }
+            
+            // Ejecutar stages paralelos si existen
+            stage.parallel?.let { parallelStages ->
+                val parallelJobs = parallelStages.stages.map { parallelStage ->
+                    async {
+                        // Ejecutar steps del stage paralelo
+                        for (step in parallelStage.steps) {
                             executeStep(step, context)
                         }
                     }
                 }
                 
-                // Ejecutar stages paralelos si existen
-                stage.parallel?.let { parallelStages ->
-                    val parallelJobs = parallelStages.stages.map { parallelStage ->
-                        parallelStage.name to suspend {
-                            // Ejecutar steps del stage paralelo
-                            for (step in parallelStage.steps) {
-                                executeStep(step, context)
-                            }
-                        }
-                    }.toTypedArray()
-                    
-                    context.parallel(*parallelJobs)
-                }
+                // Esperar a que todos los stages paralelos terminen
+                parallelJobs.awaitAll()
             }
+            
+            // Enviar evento de finalización de stage
+            context.publishEvent(PipelineExecutionEvent.StageCompleted(
+                pipelineName = "pipeline", // TODO: get from context
+                stageName = stage.name,
+                success = true
+            ))
             
             val duration = System.currentTimeMillis() - startTime
             logger.info { "Stage '${stage.name}' completed successfully in ${duration}ms" }
@@ -263,8 +266,8 @@ class PipelineEngine(
     ): Map<String, Any> {
         // Usar la API pública del contexto worker para acceso a entorno
         return runtimeEnvironment + mapOf(
-            "JOB_ID" to context.jobId.value,
-            "WORKER_ID" to context.workerId.value
+            "JOB_ID" to context.jobId,
+            "WORKER_ID" to context.workerId
         )
     }
 }

@@ -1,110 +1,117 @@
 package dev.rubentxu.hodei.pipelines.dsl.execution
 
+import dev.rubentxu.hodei.pipelines.dsl.execution.context.*
 import dev.rubentxu.hodei.pipelines.dsl.library.LibraryManager
 import dev.rubentxu.hodei.pipelines.dsl.library.PipelineLibraryManager
-import dev.rubentxu.hodei.pipelines.port.JobExecutionEvent
-import dev.rubentxu.hodei.pipelines.port.JobOutputChunk
+import dev.rubentxu.hodei.pipelines.dsl.model.PipelineExecutionEvent
+import dev.rubentxu.hodei.pipelines.dsl.model.PipelineOutputChunk
+import dev.rubentxu.hodei.pipelines.dsl.security.*
 import kotlinx.coroutines.channels.SendChannel
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Contexto standalone del Pipeline DSL para la ejecución de steps.
- * Independiente del sistema worker.
+ * Contexto del Pipeline DSL que compone diferentes responsabilidades.
+ * Aplica el principio de responsabilidad única mediante composición.
  */
 class PipelineContext(
-    val jobId: String,
-    val workerId: String,
-    val workingDirectory: File = File(System.getProperty("user.dir")),
-    val environment: MutableMap<String, String> = mutableMapOf(),
-    val outputChannel: SendChannel<JobOutputChunk>,
-    val eventChannel: SendChannel<JobExecutionEvent>,
-    val variables: MutableMap<String, Any> = ConcurrentHashMap(),
-    val libraryManager: LibraryManager = PipelineLibraryManager()
-) {
+    jobId: String,
+    workerId: String,
+    workingDirectory: File = File(System.getProperty("user.dir")),
+    environment: MutableMap<String, String> = mutableMapOf(),
+    outputChannel: SendChannel<PipelineOutputChunk>,
+    val eventChannel: SendChannel<PipelineExecutionEvent>,
+    val libraryManager: LibraryManager = PipelineLibraryManager(),
+    val securityManager: PipelineSecurityManager = PipelineSandbox(SecurityPolicy.cicd()),
+    val commandExecutor: CommandExecutor = CommandExecutor(
+        outputChannel = outputChannel,
+        eventChannel = eventChannel,
+        securityManager = securityManager
+    )
+) : ExecutionContext(jobId, workerId, workingDirectory, environment) {
+    
+    // Contexto de salida delegado
+    private val outputContext: OutputContext = StreamingOutputContext(outputChannel)
     
     /**
      * Imprime un mensaje al output del pipeline.
      */
-    suspend fun println(message: String) {
-        val chunk = JobOutputChunk(
-            jobId = jobId,
-            data = "$message\n".toByteArray(),
-            isError = false,
-            timestamp = System.currentTimeMillis()
-        )
-        outputChannel.send(chunk)
-    }
+    suspend fun println(message: String) = outputContext.println(message)
     
     /**
      * Imprime un mensaje de error al output del pipeline.
      */
-    suspend fun printError(message: String) {
-        val chunk = JobOutputChunk(
-            jobId = jobId,
-            data = "$message\n".toByteArray(),
-            isError = true,
-            timestamp = System.currentTimeMillis()
-        )
-        outputChannel.send(chunk)
-    }
+    suspend fun printError(message: String) = outputContext.printError(message)
+    
+    /**
+     * Escribe datos binarios al output.
+     */
+    suspend fun write(data: ByteArray, isError: Boolean = false) = 
+        outputContext.write(data, isError)
+    
+    /**
+     * Redirige los streams estándar a los channels del pipeline.
+     */
+    fun redirectStandardStreams() = outputContext.redirectStandardStreams()
     
     /**
      * Ejecuta un comando del sistema.
+     * Delega al CommandExecutor para separar responsabilidades.
      */
-    suspend fun executeCommand(command: List<String>): Int {
-        val processBuilder = ProcessBuilder(command)
-            .directory(workingDirectory)
-            .redirectErrorStream(false)
-        
-        // Configurar environment
-        processBuilder.environment().putAll(environment)
-        
-        val process = processBuilder.start()
-        
-        // Capturar output en tiempo real
-        val outputReader = process.inputStream.bufferedReader()
-        val errorReader = process.errorStream.bufferedReader()
-        
-        // Leer output estándar
-        outputReader.useLines { lines ->
-            lines.forEach { line ->
-                println(line)
-            }
-        }
-        
-        // Leer error estándar
-        errorReader.useLines { lines ->
-            lines.forEach { line ->
-                printError(line)
-            }
-        }
-        
-        return process.waitFor()
-    }
+    suspend fun executeCommand(
+        command: List<String>,
+        timeout: kotlin.time.Duration = kotlin.time.Duration.minutes(30)
+    ): Int = commandExecutor.executeCommand(
+        command = command,
+        workingDirectory = workingDirectory,
+        environment = environment,
+        timeout = timeout,
+        jobId = jobId,
+        stepId = "${jobId}-command"
+    )
     
     /**
-     * Ejecuta un comando shell simple.
+     * Ejecuta un comando shell con verificación de seguridad.
+     * Delega al CommandExecutor especializado.
      */
-    suspend fun sh(command: String): Int {
-        return if (System.getProperty("os.name").lowercase().contains("windows")) {
-            executeCommand(listOf("cmd", "/c", command))
-        } else {
-            executeCommand(listOf("sh", "-c", command))
-        }
-    }
+    suspend fun sh(
+        command: String,
+        timeout: kotlin.time.Duration = kotlin.time.Duration.minutes(30)
+    ): Int = commandExecutor.executeShell(
+        command = command,
+        workingDirectory = workingDirectory,
+        environment = environment,
+        timeout = timeout,
+        jobId = jobId,
+        stepId = "${jobId}-sh"
+    )
     
     /**
-     * Ejecuta un comando batch (Windows).
+     * Ejecuta un comando batch (Windows) con verificación de seguridad.
+     * Delega al CommandExecutor especializado.
      */
-    suspend fun bat(command: String): Int {
-        return executeCommand(listOf("cmd", "/c", command))
-    }
+    suspend fun bat(
+        command: String,
+        timeout: kotlin.time.Duration = kotlin.time.Duration.minutes(30)
+    ): Int = commandExecutor.executeBatch(
+        command = command,
+        workingDirectory = workingDirectory,
+        environment = environment,
+        timeout = timeout,
+        jobId = jobId,
+        stepId = "${jobId}-bat"
+    )
     
     /**
-     * Cambia el directorio de trabajo.
+     * Cambia el directorio de trabajo con verificación de seguridad.
      */
     fun changeDirectory(path: String): File {
+        // Verificar acceso de seguridad al directorio
+        val securityCheck = checkFileAccess(path, FileOperation.READ)
+        if (securityCheck is SecurityCheckResult.Denied) {
+            val violationMessages = securityCheck.violations.joinToString(", ") { it.message }
+            throw SecurityException("Directory access blocked by security policy: $violationMessages")
+        }
+        
         val newDir = if (File(path).isAbsolute) {
             File(path)
         } else {
@@ -119,34 +126,39 @@ class PipelineContext(
     }
     
     /**
-     * Establece una variable de entorno.
+     * DSL para contexto de ejecución con variables.
      */
-    fun setEnv(key: String, value: String) {
-        environment[key] = value
+    inline fun <T> withVariable(key: String, value: T, block: () -> Unit) {
+        val previousValue = getVariable<T>(key)
+        try {
+            setVariable(key, value as Any)
+            block()
+        } finally {
+            if (previousValue != null) {
+                setVariable(key, previousValue)
+            }
+        }
     }
     
     /**
-     * Obtiene una variable de entorno.
+     * DSL para contexto de ejecución con múltiples variables.
      */
-    fun getEnv(key: String): String? = environment[key]
-    
-    /**
-     * Establece una variable del pipeline.
-     */
-    fun setVariable(key: String, value: Any) {
-        variables[key] = value
+    inline fun withVariables(vararg pairs: Pair<String, Any>, block: () -> Unit) {
+        val previousValues = pairs.map { it.first to getVariable<Any>(it.first) }
+        try {
+            pairs.forEach { setVariable(it.first, it.second) }
+            block()
+        } finally {
+            previousValues.forEach { (key, value) ->
+                if (value != null) setVariable(key, value)
+            }
+        }
     }
-    
-    /**
-     * Obtiene una variable del pipeline.
-     */
-    @Suppress("UNCHECKED_CAST")
-    fun <T> getVariable(key: String): T? = variables[key] as? T
     
     /**
      * Publica un evento del pipeline.
      */
-    suspend fun publishEvent(event: JobExecutionEvent) {
+    suspend fun publishEvent(event: PipelineExecutionEvent) {
         eventChannel.send(event)
     }
     
@@ -173,4 +185,28 @@ class PipelineContext(
      * Lista todas las librerías cargadas.
      */
     fun getAllLibraries() = libraryManager.getAllLoadedLibraries()
+    
+    /**
+     * Verifica acceso a archivos antes de operaciones.
+     */
+    fun checkFileAccess(path: String, operation: FileOperation): SecurityCheckResult {
+        return securityManager.checkFileAccess(path, operation)
+    }
+    
+    /**
+     * Verifica que una librería sea segura antes de cargarla.
+     */
+    fun checkLibrarySecurity(libraryId: String): SecurityCheckResult {
+        return securityManager.checkLibraryAccess(libraryId)
+    }
+    
+    /**
+     * Obtiene la política de seguridad actual.
+     */
+    fun getSecurityPolicy(): SecurityPolicy = securityManager.securityPolicy
+    
+    /**
+     * Verifica si el sandbox está habilitado.
+     */
+    fun isSandboxEnabled(): Boolean = securityManager.securityPolicy.sandboxEnabled
 }

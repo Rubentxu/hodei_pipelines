@@ -1,14 +1,9 @@
 package dev.rubentxu.hodei.pipelines.dsl.execution
 
-import dev.rubentxu.hodei.pipelines.domain.job.JobId
-import dev.rubentxu.hodei.pipelines.domain.worker.WorkerId
 import dev.rubentxu.hodei.pipelines.dsl.model.*
-import dev.rubentxu.hodei.pipelines.port.JobExecutionEvent
-import dev.rubentxu.hodei.pipelines.port.JobOutputChunk
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -34,10 +29,10 @@ class SimplePipelineEngineTest {
             )
         )
 
-        val jobId = JobId("echo-test")
-        val workerId = WorkerId("test-worker")
-        val outputChannel = Channel<JobOutputChunk>(Channel.UNLIMITED)
-        val eventChannel = Channel<JobExecutionEvent>(Channel.UNLIMITED)
+        val jobId = "echo-test"
+        val workerId = "test-worker"
+        val outputChannel = Channel<PipelineOutputChunk>(Channel.UNLIMITED)
+        val eventChannel = Channel<PipelineExecutionEvent>(Channel.UNLIMITED)
 
         // When
         val result = pipelineEngine.execute(
@@ -53,7 +48,7 @@ class SimplePipelineEngineTest {
         assertEquals(1, result.stageResults.size)
         assertEquals("Echo Stage", result.stageResults[0].stageName)
         assertTrue(result.stageResults[0].success)
-        
+
         outputChannel.close()
         eventChannel.close()
     }
@@ -69,10 +64,10 @@ class SimplePipelineEngineTest {
             )
         )
 
-        val jobId = JobId("multi-test")
-        val workerId = WorkerId("test-worker")
-        val outputChannel = Channel<JobOutputChunk>(Channel.UNLIMITED)
-        val eventChannel = Channel<JobExecutionEvent>(Channel.UNLIMITED)
+        val jobId = "multi-test"
+        val workerId = "test-worker"
+        val outputChannel = Channel<PipelineOutputChunk>(Channel.UNLIMITED)
+        val eventChannel = Channel<PipelineExecutionEvent>(Channel.UNLIMITED)
 
         // When
         val result = pipelineEngine.execute(
@@ -86,7 +81,7 @@ class SimplePipelineEngineTest {
         // Then
         assertTrue(result.success)
         assertEquals(2, result.stageResults.size)
-        
+
         outputChannel.close()
         eventChannel.close()
     }
@@ -104,10 +99,10 @@ class SimplePipelineEngineTest {
             )
         )
 
-        val jobId = JobId("timing-test")
-        val workerId = WorkerId("test-worker")
-        val outputChannel = Channel<JobOutputChunk>(Channel.UNLIMITED)
-        val eventChannel = Channel<JobExecutionEvent>(Channel.UNLIMITED)
+        val jobId = "timing-test"
+        val workerId = "test-worker"
+        val outputChannel = Channel<PipelineOutputChunk>(Channel.UNLIMITED)
+        val eventChannel = Channel<PipelineExecutionEvent>(Channel.UNLIMITED)
 
         // When
         val result = pipelineEngine.execute(
@@ -122,7 +117,7 @@ class SimplePipelineEngineTest {
         assertTrue(result.success)
         assertTrue(result.duration > 0)
         assertTrue(result.stageResults[0].duration > 0)
-        
+
         outputChannel.close()
         eventChannel.close()
     }
