@@ -14,6 +14,7 @@ import dev.rubentxu.hodei.resourcemanagement.infrastructure.docker.DockerInstanc
 import dev.rubentxu.hodei.resourcemanagement.infrastructure.docker.DockerResourceMonitor
 import dev.rubentxu.hodei.resourcemanagement.infrastructure.docker.DockerEnvironmentBootstrap
 import dev.rubentxu.hodei.resourcemanagement.infrastructure.docker.DockerConfig
+import dev.rubentxu.hodei.resourcemanagement.infrastructure.docker.DockerMonitoringConfig
 import com.github.dockerjava.api.DockerClient
 import com.github.dockerjava.core.DefaultDockerClientConfig
 import com.github.dockerjava.core.DockerClientBuilder
@@ -48,6 +49,8 @@ import dev.rubentxu.hodei.security.infrastructure.api.AuthController
 import dev.rubentxu.hodei.templatemanagement.infrastructure.api.controllers.TemplateControllerNew
 import dev.rubentxu.hodei.security.application.services.JwtService
 import dev.rubentxu.hodei.security.application.services.AuthService
+import dev.rubentxu.hodei.security.application.services.BootstrapUsersService
+import dev.rubentxu.hodei.templatemanagement.application.services.WorkerTemplateService
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
@@ -64,6 +67,7 @@ val appModule = module {
     
     // Docker Client configuration
     single<DockerConfig> { DockerConfig() }
+    single<DockerMonitoringConfig> { DockerMonitoringConfig() }
     
     single<DockerClient> {
         val config = get<DockerConfig>()
@@ -130,6 +134,10 @@ val appModule = module {
     // Security services
     single { JwtService() }
     single { AuthService(get(), get(), get(), get()) }
+    single { BootstrapUsersService(get(), get(), get()) }
+    
+    // Template management
+    single { WorkerTemplateService(get()) }
     
     // Create services in the right order to avoid circular dependencies
     single { 

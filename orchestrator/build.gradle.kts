@@ -49,9 +49,6 @@ dependencies {
     implementation(libs.docker.java.transport.httpclient5)
     implementation("com.github.docker-java:docker-java:3.4.1")
     
-    // CLI
-    implementation(libs.clikt)
-    
     // Testing
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions.core)

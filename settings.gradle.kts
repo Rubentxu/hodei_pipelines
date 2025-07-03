@@ -11,6 +11,7 @@ pluginManagement {
 
 include(
     ":orchestrator",
+    ":hodei-pipelines-cli",
     ":shared:proto",
     ":worker:core",
     ":worker:infrastructure",

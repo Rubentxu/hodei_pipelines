@@ -1,262 +1,387 @@
-# Guía Rápida: Ejecutar Job con Docker en Hodei Pipelines
+# Quick Start Guide: Run Job with Docker in Hodei Pipelines
 
-Esta guía te muestra cómo levantar el orquestador y ejecutar un job usando Docker en tu máquina local, recibiendo toda la salida por consola.
+This guide shows you how to start the orchestrator and run a job using the new Hodei CLI (`hp`) and Docker on your local machine.
 
-## Prerrequisitos
+## Prerequisites
 
-- Java 17+ instalado
-- Docker instalado y funcionando
-- Gradle instalado (no uses gradlew según configuración del proyecto)
+- Java 17+ installed
+- Docker installed and running
+- Gradle installed (don't use gradlew according to project configuration)
 
-## Paso 1: Compilar el Proyecto
+## Step 1: Build the Project
 
 ```bash
-# Desde el directorio raíz del proyecto
+# From the project root directory
 gradle clean build -x test
 ```
 
-## Paso 2: Iniciar el Orquestador
+## Step 2: Start the Orchestrator
 
 ```bash
-# Opción 1: Usando gradle
+# Option 1: Using gradle
 gradle :orchestrator:run
 
-# Opción 2: Usando el JAR generado
-java -jar orchestrator/build/libs/orchestrator-*.jar --mode=orchestrator
+# Option 2: Using the generated JAR
+java -jar orchestrator/build/libs/orchestrator-all.jar
 
-# El orquestador se iniciará en http://localhost:8080
+# The orchestrator will start at http://localhost:8080
 ```
 
-El orquestador expondrá:
-- REST API en puerto 8080
-- gRPC server en puerto 9090 (para comunicación con workers)
+The orchestrator will automatically:
+- **Bootstrap default users** (admin/admin123, user/user123, moderator/mod123)
+- **Discover Docker environment** and register it as a resource pool
+- **Create default worker templates** for different scenarios
+- Expose REST API on port 8080
+- Expose gRPC server on port 9090 (for worker communication)
 
-## Paso 3: Verificar el Estado del Orquestador
+Expected startup output:
+```
+🚀 Starting system bootstrap...
+🔐 Initializing default users...
+✅ Created user: admin with roles: [ADMIN]
+✅ Created user: user with roles: [USER]  
+✅ Created user: moderator with roles: [MODERATOR]
 
-```bash
-# Verificar health
-curl http://localhost:8080/health
+🔑 Default User Credentials (for CLI testing):
+==================================================
+👑 Admin:     admin / admin123
+👤 User:      user / user123
+🛡️ Moderator: moderator / mod123
+==================================================
+💡 Use these credentials with: hp login http://localhost:8080
 
-# Respuesta esperada:
-# {
-#   "status": "healthy",
-#   "checks": {
-#     "database": "ok",
-#     "grpc": "ok"
-#   }
-# }
+🏗️ Docker environment registered as resource pool
+📋 Default worker templates created: 7 templates
+==================================================
+🔗 CLI Usage: hp login http://localhost:8080
+🔗 Health Check: curl http://localhost:8080/v1/health
 ```
 
-## Paso 4: Descubrir y Configurar Docker
-
-Usar el CLI de Hodei para descubrir el entorno Docker local:
+## Step 3: Setup the Hodei CLI (`hp`)
 
 ```bash
-# Compilar el CLI si no está compilado
-gradle :orchestrator:installDist
+# Build the CLI
+gradle :hodei-pipelines-cli:build
 
-# Descubrir Docker
-./orchestrator/build/install/orchestrator/bin/hodei docker discover
+# Add to PATH for convenience (optional)
+export PATH=$PATH:$(pwd)/hodei-pipelines-cli/build/distributions/hodei-pipelines-cli/bin
 
-# Salida esperada:
-# 🔍 Discovering Docker environment...
-# ✅ Docker discovered: version 28.2.2
-# 💻 CPU: 8 cores available
-# 🧮 Memory: 16GB total
-# 📊 Optimal configuration:
-#    - Max workers: 4
-#    - Memory per worker: 2GB
-#    - CPU per worker: 1.5 cores
+# Verify installation
+hp version
 ```
 
-## Paso 5: Registrar Pool de Recursos Docker
+## Step 4: Login to Orchestrator
 
 ```bash
-# Crear un pool de recursos Docker
-./orchestrator/build/install/orchestrator/bin/hodei pool create \
-  --name "local-docker" \
-  --type docker \
-  --max-workers 2
+# Login with admin credentials
+hp login http://localhost:8080 --username admin --password admin123
 
-# Verificar el pool
-./orchestrator/build/install/orchestrator/bin/hodei pool list
+# Or login interactively
+hp login http://localhost:8080
+
+# Verify login
+hp whoami
 ```
 
-## Paso 6: Crear Templates de Worker (Opcional)
-
-Los templates ya vienen predefinidos, pero puedes crear uno personalizado:
-
-```bash
-# Listar templates disponibles
-./orchestrator/build/install/orchestrator/bin/hodei template list
-
-# Crear template personalizado
-./orchestrator/build/install/orchestrator/bin/hodei template create \
-  --name "my-docker-worker" \
-  --type docker \
-  --image "hodei/worker:latest" \
-  --cpu "500m" \
-  --memory "1Gi"
+Expected output:
+```
+Username: admin
+Email: admin@hodei.local
+Roles: [ADMIN]
+Context: default
+Server: http://localhost:8080
 ```
 
-## Paso 7: Ejecutar un Job con el Pipeline DSL
-
-### Opción A: Ejecución Local (sin orquestador)
+## Step 5: Verify System Status
 
 ```bash
-# Compilar el CLI del pipeline DSL
-gradle :pipeline-dsl:pipeline-cli:installDist
+# Check orchestrator health
+hp health
 
-# Ejecutar el pipeline de ejemplo localmente
+# Check system status
+hp status
+
+# List available resources
+hp pool list
+hp template list
+hp worker list
+```
+
+Expected output:
+```bash
+$ hp pool list
+NAME                   TYPE     WORKERS  STATUS
+auto-discovered-docker docker   0/2      healthy
+
+$ hp template list
+NAME                      TYPE     IMAGE                    CPU    MEMORY
+default-docker-worker     docker   hodei/worker:latest      100m   256Mi
+performance-docker-worker docker   hodei/worker:latest      1000m  2Gi
+docker-ci-pipeline-worker docker   hodei/worker-ci:latest   500m   1Gi
+...
+```
+
+## Step 6: Submit Your First Job
+
+Now you can submit a job using the pipeline DSL:
+
+```bash
+# Submit a job using the HP CLI
+hp job submit examples/hello-world.pipeline.kts --name "my-first-job"
+
+# Expected output:
+# ✅ Job submitted successfully!
+# 🆔 Job ID: job-abc123-def456
+# 📊 Status: queued
+# 
+# 💡 Monitor with: hp job status job-abc123-def456
+# 📋 View logs: hp job logs job-abc123-def456 -f
+```
+
+### Monitor Job Execution
+
+```bash
+# Check job status
+hp job status job-abc123-def456
+
+# Follow real-time logs
+hp job logs job-abc123-def456 --follow
+
+# List all jobs
+hp job list
+
+# List only running jobs
+hp job list --status running
+```
+
+Expected log output:
+```
+🔍 Checking environment...
+Greeting: Hello from Hodei Pipelines!
+Build Number: 1.0.0
+...
+🎉 Pipeline completed successfully!
+```
+
+### Alternative: Using Pipeline DSL CLI Directly
+
+You can also use the pipeline DSL CLI for local execution:
+
+```bash
+# Build the pipeline DSL CLI
+gradle :pipeline-dsl:pipeline-cli:build
+
+# Execute locally
 ./pipeline-dsl/pipeline-cli/build/install/pipeline-cli/bin/pipeline-dsl execute \
   examples/hello-world.pipeline.kts \
   --verbose
 
-# La salida se mostrará directamente en consola
-```
-
-### Opción B: Ejecución Remota (usando el orquestador)
-
-```bash
-# Ejecutar el pipeline a través del orquestador
+# Execute remotely through orchestrator
 ./pipeline-dsl/pipeline-cli/build/install/pipeline-cli/bin/pipeline-dsl execute \
   examples/hello-world.pipeline.kts \
   --orchestrator http://localhost:8080 \
-  --pool local-docker \
-  --follow \
-  --verbose
-
-# Salida esperada:
-# 🚀 Executing pipeline: hello-world.pipeline.kts
-# 📋 Job ID: abc123...
-# 🌐 Remote execution via orchestrator: http://localhost:8080
-# 🏊 Resource Pool: local-docker
-# 
-# ✅ Connected to orchestrator (healthy)
-# 📦 Version: 1.0.0
-# 
-# 📤 Submitting job to orchestrator...
-# ✅ Job submitted successfully!
-# 🆔 Remote Job ID: job-xyz789
-# 📊 Status: queued
-# 
-# 👀 Following job execution...
-# Press Ctrl+C to stop following (job will continue running)
-# 
-# 📊 Status: running
-# 🔧 Worker: docker-worker-001
-# 
-# [LOGS EN TIEMPO REAL DEL PIPELINE]
-# 🔍 Checking environment...
-# Greeting: Hello from Hodei Pipelines!
-# Build Number: 1.0.0
-# ...
-# 🎉 Pipeline completed successfully!
-# 
-# 🏁 Execution completed!
-# 📊 Final Status: completed
-# ⏱️ Duration: 15432ms
+  --pool auto-discovered-docker \
+  --follow
 ```
 
-## Paso 8: Iniciar un Worker Docker Manualmente (Opcional)
+## Step 7: Advanced Usage
 
-Si quieres ver el worker en acción, puedes iniciarlo manualmente:
+### Create Custom Templates
 
 ```bash
-# Opción 1: Usando Docker directamente
-docker run -it --rm \
-  --name hodei-worker-001 \
-  -e HODEI_ORCHESTRATOR_HOST=host.docker.internal \
-  -e HODEI_ORCHESTRATOR_PORT=9090 \
-  -e WORKER_ID=manual-worker-001 \
-  hodei/worker:latest
+# Create a custom template for Node.js projects
+hp template create nodejs-worker \
+  --type docker \
+  --image node:18-alpine \
+  --cpu 1 \
+  --memory 2Gi
 
-# Opción 2: Usando el CLI
-./orchestrator/build/install/orchestrator/bin/hodei docker worker start \
-  --pool local-docker \
-  --count 1
+# Create from file
+hp template create my-template --file template.yaml
 ```
 
-## Monitoreo y Depuración
+### Manage Multiple Contexts
 
-### Ver Logs del Orquestador
 ```bash
-# Los logs se muestran en la consola donde iniciaste el orquestador
-# También puedes configurar logging en application.conf
+# Add production environment
+hp login https://prod.hodei.io --username operator --password secret --context prod
+
+# List contexts
+hp config get-contexts
+
+# Switch between environments
+hp config use-context prod
+hp job submit prod-deploy.kts
+
+hp config use-context default
+hp job submit test-build.kts
 ```
 
-### Ver Estado de Jobs
+### Advanced Job Submission
+
 ```bash
-# Listar jobs
-curl http://localhost:8080/jobs
+# Submit with parameters
+hp job submit deploy.kts \
+  --parameters '{"env": "staging", "version": "1.2.3"}' \
+  --wait \
+  --timeout 30m
 
-# Ver detalles de un job específico
-curl http://localhost:8080/jobs/{job-id}
+# Submit with parameters from file
+hp job submit deploy.kts --parameters @params.json
 
-# Ver logs de ejecución
-curl http://localhost:8080/executions/{execution-id}/logs
+# Submit to specific pool and template
+hp job submit heavy-task.kts \
+  --pool performance-pool \
+  --template gpu-worker
 ```
 
-### Ver Workers Activos
-```bash
-# Usando el CLI
-./orchestrator/build/install/orchestrator/bin/hodei docker status
+## Monitoring and Debugging
 
-# Usando la API
-curl http://localhost:8080/workers
+### Using the HP CLI
+
+```bash
+# Check system health
+hp health
+
+# View system status
+hp status
+
+# List all resources
+hp pool list
+hp worker list
+hp template list
+hp job list
+
+# Monitor specific job
+hp job status job-abc123
+hp job logs job-abc123 --follow --since 1h
+
+# Cancel running job
+hp job cancel job-abc123
+```
+
+### Using the REST API
+
+```bash
+# Health check
+curl http://localhost:8080/v1/health
+
+# List jobs
+curl http://localhost:8080/v1/jobs
+
+# Job details
+curl http://localhost:8080/v1/jobs/{job-id}
+
+# Job logs (with authentication)
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8080/v1/jobs/{job-id}/logs
 ```
 
 ## Troubleshooting
 
-### El orquestador no inicia
-- Verifica que el puerto 8080 no esté en uso
-- Revisa los logs para errores de configuración
-- Asegúrate de tener Java 17+
-
-### Docker no es detectado
-- Verifica que Docker esté instalado: `docker --version`
-- Asegúrate de que el daemon esté corriendo: `docker ps`
-- En Linux, verifica permisos: `sudo usermod -aG docker $USER`
-
-### El worker no se conecta
-- Verifica que el orquestador esté corriendo
-- Revisa la conectividad de red (especialmente en Docker)
-- Usa `host.docker.internal` en lugar de `localhost` desde contenedores
-
-### No veo los logs en tiempo real
-- Asegúrate de usar la flag `--follow` o `-f`
-- Verifica que el WebSocket/SSE esté funcionando
-- Revisa si hay proxies o firewalls bloqueando
-
-## Ejemplo Completo de Sesión
-
+### CLI Connection Issues
 ```bash
-# Terminal 1: Iniciar orquestador
-$ gradle :orchestrator:run
-[INFO] Starting Hodei Pipelines Orchestrator...
-[INFO] REST API listening on http://localhost:8080
-[INFO] gRPC server listening on port 9090
+# Check if orchestrator is running
+hp health
 
-# Terminal 2: Ejecutar comandos
-$ ./orchestrator/build/install/orchestrator/bin/hodei docker discover
-$ ./orchestrator/build/install/orchestrator/bin/hodei pool create --name local-docker --type docker
-$ ./pipeline-dsl/pipeline-cli/build/install/pipeline-cli/bin/pipeline-dsl execute \
-    examples/hello-world.pipeline.kts \
-    --orchestrator http://localhost:8080 \
-    --pool local-docker \
-    --follow
+# Test with different context
+hp config get-contexts
+hp config use-context <other-context>
 
-# Ver toda la salida del pipeline en tiempo real
+# Re-login if authentication fails
+hp logout
+hp login http://localhost:8080
 ```
 
-## Próximos Pasos
+### Orchestrator Issues
+```bash
+# Check health endpoint
+curl http://localhost:8080/v1/health
 
-1. **Personalizar pipelines**: Modifica `hello-world.pipeline.kts` o crea tus propios pipelines
-2. **Configurar templates**: Define templates específicos para tus necesidades
-3. **Escalar workers**: Aumenta el número de workers para ejecución paralela
-4. **Integrar con CI/CD**: Usa la API REST para integrar con sistemas existentes
+# Verify default users are created
+# (check orchestrator startup logs for bootstrap information)
 
-## Referencias
+# Check if ports are available
+netstat -tulpn | grep -E ':(8080|9090)'
+```
+
+### Docker Issues
+```bash
+# Verify Docker is running
+docker version
+docker ps
+
+# Check Docker permissions (Linux)
+sudo usermod -aG docker $USER
+# (logout and login again)
+
+# Check Docker connectivity
+docker run hello-world
+```
+
+### Job Execution Issues
+```bash
+# Check job status and logs
+hp job status <job-id>
+hp job logs <job-id>
+
+# List available resources
+hp pool list
+hp template list
+hp worker list
+
+# Check system status
+hp status
+```
+
+## Complete Session Example
+
+```bash
+# Terminal 1: Start orchestrator
+$ gradle :orchestrator:run
+🚀 Starting system bootstrap...
+✅ Created user: admin with roles: [ADMIN]
+✅ Created user: user with roles: [USER]
+✅ Created user: moderator with roles: [MODERATOR]
+🏗️ Docker environment registered as resource pool
+📋 Default worker templates created: 7 templates
+🔗 CLI Usage: hp login http://localhost:8080
+
+# Terminal 2: Use the HP CLI
+$ hp login http://localhost:8080 -u admin -p admin123
+✅ Login successful
+
+$ hp status
+🚀 Hodei Pipelines Status
+==================================================
+Server: http://localhost:8080
+User: admin (ADMIN)
+Health: ✅ Healthy
+
+Resource Pools: 1
+Templates: 7
+Workers: 0
+Jobs: 0
+
+$ hp job submit examples/hello-world.pipeline.kts --name hello-world
+✅ Job submitted successfully!
+🆔 Job ID: job-abc123-def456
+
+$ hp job logs job-abc123-def456 -f
+🔍 Checking environment...
+Greeting: Hello from Hodei Pipelines!
+Build Number: 1.0.0
+🎉 Pipeline completed successfully!
+```
+
+## Next Steps
+
+1. **Customize pipelines**: Modify `hello-world.pipeline.kts` or create your own pipelines
+2. **Configure templates**: Define templates specific to your needs
+3. **Scale workers**: Increase the number of workers for parallel execution
+4. **Integrate with CI/CD**: Use the REST API to integrate with existing systems
+
+## References
 
 - [Pipeline DSL Documentation](./PIPELINE_DSL.md)
 - [REST API Reference](./API_REFERENCE.md)

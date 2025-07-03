@@ -30,6 +30,7 @@ import org.koin.ktor.ext.inject
 fun Application.configureModules() {
     configureDependencyInjection()
     configureDockerEnvironment()
+    configureBootstrap()
     configureSerialization()
     configureHTTP()
     configureMonitoring()
@@ -153,6 +154,11 @@ fun Application.configureGrpcServer() {
 fun Application.configureDockerEnvironment() {
     val dockerStartup = DockerStartupConfiguration()
     dockerStartup.initialize()
+}
+
+fun Application.configureBootstrap() {
+    val bootstrap = BootstrapConfiguration()
+    bootstrap.initialize()
 }
 
 private fun generateCorrelationId(): String = UUID.randomUUID().toString()
