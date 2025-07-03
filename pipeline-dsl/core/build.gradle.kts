@@ -8,7 +8,6 @@ dependencies {
     // Pipeline DSL standalone - minimal dependencies
     
     // Kotlin Core
-    implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     
@@ -25,11 +24,11 @@ dependencies {
     
     // Testing
     testImplementation(libs.kotlin.test)
-    testImplementation(libs.kotlin.test.junit5)
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions.core)
     testImplementation(libs.mockk)
-    testImplementation(libs.kotlinx.coroutines.test)
+
+
 }
 
 tasks.test {

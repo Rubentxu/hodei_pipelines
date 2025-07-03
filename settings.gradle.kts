@@ -10,14 +10,9 @@ pluginManagement {
 }
 
 include(
-    ":core:domain",
-    ":core:application",
-    ":core:infrastructure",
-    ":backend:application",
-    ":backend:infrastructure",
-    ":worker:app",
-    ":worker:domain",
-    ":worker:application",
+    ":orchestrator",
+    ":shared:proto",
+    ":worker:core",
     ":worker:infrastructure",
     ":pipeline-dsl:core",
     ":pipeline-dsl:pipeline-cli",

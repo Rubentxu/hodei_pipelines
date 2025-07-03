@@ -1,34 +1,115 @@
 [versions]
-kotlin = "2.1.21"
-ktor = "3.1.3"
-koin = "4.1.0"
+kotlin = "2.2.0"
+ktor = "3.2.0"
+kotlinx-coroutines = "1.10.2"
+kotlinx-serialization = "1.7.3"
+kotlinx-datetime = "0.6.1"
+exposed = "1.0.0-beta-2"
+postgresql = "42.7.4"
+flyway = "10.19.0"
+hikaricp = "6.2.1"
+koin = "4.0.0"
+arrow = "1.2.4"
+logback = "1.5.12"
+micrometer = "1.14.2"
+opentelemetry = "1.43.0"
+grpc = "1.66.0"
+grpc-kotlin = "1.4.1"
+protobuf = "4.28.2"
 kotest = "5.9.1"
-mockk = "1.14.2"
-junitJupiter = "5.13.1"
-hikariCP = "5.1.0"
-postgresqlDriver = "42.7.7"
-testcontainers = "1.19.7"
-testcontainersJunitJupiter = "1.19.3"
-kotlinxCoroutinesCore = "1.10.2"
-kotlinxCoroutinesTest = "1.10.2"
-kotlinxSerializationJson = "1.8.1"
-ktlintGradlePlugin = "12.3.0"
-grpc = "1.73.0"
-grpcKotlin = "1.4.3"
-protobuf = "4.31.1"
-protobufPlugin = "0.9.5"
-osdetector = "1.7.3"
-kubernetesClient = "24.0.0"
-mockito = "5.8.0"
-mockitoKotlin = "5.2.1"
-
+testcontainers = "1.20.4"
+mockk = "1.13.14"
+detekt = "1.23.7"
+ktlint = "12.1.2"
+auth0-jwt = "4.5.0"
+jbcrypt = "0.4"
 
 [libraries]
-# Kotlin
-kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin" }
+# Ktor
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
+ktor-server-auth-jwt = { module = "io.ktor:ktor-server-auth-jwt", version.ref = "ktor" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+ktor-server-sse = { module = "io.ktor:ktor-server-sse", version.ref = "ktor" }
+ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }
+ktor-server-metrics-micrometer = { module = "io.ktor:ktor-server-metrics-micrometer", version.ref = "ktor" }
+ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
+ktor-server-compression = { module = "io.ktor:ktor-server-compression", version.ref = "ktor" }
+ktor-server-openapi = { module = "io.ktor:ktor-server-openapi", version.ref = "ktor" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+kotlin-logging-jvm = { module = "io.github.microutils:kotlin-logging-jvm", version = "3.0.5" }
+
+# Kotlinx
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-serialization-protobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version.ref = "kotlinx-serialization" }
+
+# Kotlinx Additional
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+
+# Database
+exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
+exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
+exposed-dao = { module = "org.jetbrains.exposed:exposed-dao", version.ref = "exposed" }
+exposed-kotlin-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datetime", version.ref = "exposed" }
+exposed-migration = { module = "org.jetbrains.exposed:exposed-migration", version.ref = "exposed" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
+
+# DI
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-ktor = { module = "io.insert-koin:koin-ktor", version.ref = "koin" }
+koin-logger-slf4j = { module = "io.insert-koin:koin-logger-slf4j", version.ref = "koin" }
+
+# Error Handling
+arrow-core = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
+arrow-fx-coroutines = { module = "io.arrow-kt:arrow-fx-coroutines", version.ref = "arrow" }
+
+# Logging
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version = "7.0.0" }
+
+# Observability
+micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
+micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "micrometer" }
+opentelemetry-api = { module = "io.opentelemetry:opentelemetry-api", version.ref = "opentelemetry" }
+opentelemetry-instrumentation-ktor = { module = "io.opentelemetry.instrumentation:opentelemetry-ktor-2.0", version = "2.5.0-alpha" }
+
+# gRPC
+grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded", version.ref = "grpc" }
+grpc-protobuf = { module = "io.grpc:grpc-protobuf", version.ref = "grpc" }
+grpc-kotlin-stub = { module = "io.grpc:grpc-kotlin-stub", version.ref = "grpc-kotlin" }
+grpc-services = { module = "io.grpc:grpc-services", version.ref = "grpc" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+protobuf-kotlin = { module = "com.google.protobuf:protobuf-kotlin", version.ref = "protobuf" }
+
+# Security/Authentication
+auth0-jwt = { module = "com.auth0:java-jwt", version.ref = "auth0-jwt" }
+jbcrypt = { module = "org.mindrot:jbcrypt", version.ref = "jbcrypt" }
+
+# Testing
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
-kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin" }
+kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
+kotest-property = { module = "io.kotest:kotest-property", version.ref = "kotest" }
+kotest-framework-datatest = { module = "io.kotest:kotest-framework-datatest", version.ref = "kotest" }
+kotest-assertions-json = { module = "io.kotest:kotest-assertions-json", version.ref = "kotest" }
+kotest-extensions-koin = { module = "io.kotest.extensions:kotest-extensions-koin", version = "1.3.0" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+koin-test = { module = "io.insert-koin:koin-test", version.ref = "koin" }
+
+# Script
 kotlin-scripting-jvm = { module = "org.jetbrains.kotlin:kotlin-scripting-jvm", version.ref = "kotlin" }
 kotlin-scripting-jvm-host = { module = "org.jetbrains.kotlin:kotlin-scripting-jvm-host", version.ref = "kotlin" }
 kotlin-scripting-common = { module = "org.jetbrains.kotlin:kotlin-scripting-common", version.ref = "kotlin" }
@@ -36,77 +117,102 @@ kotlin-scripting-dependencies = { module = "org.jetbrains.kotlin:kotlin-scriptin
 kotlin-scripting-dependencies-maven = { module = "org.jetbrains.kotlin:kotlin-scripting-dependencies-maven", version.ref = "kotlin" }
 kotlin-scripting-util = { module = "org.jetbrains.kotlin:kotlin-scripting-util", version.ref = "kotlin" }
 kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
-kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
-kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
-grpc-protobuf = { module = "io.grpc:grpc-protobuf", version.ref = "grpc" }
-grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "grpc" }
-grpc-context = { module = "io.grpc:grpc-context", version.ref = "grpc" }
-grpc-kotlin-stub = { module = "io.grpc:grpc-kotlin-stub", version.ref = "grpcKotlin" }
-protobuf-kotlin = { module = "com.google.protobuf:protobuf-kotlin", version.ref = "protobuf" }
-grpc-netty-shaded = { module = "io.grpc:grpc-netty-shaded", version.ref = "grpc" }
-grpc-services = { module = "io.grpc:grpc-services", version.ref = "grpc" }
-kotlin-logging-jvm = { module = "io.github.microutils:kotlin-logging-jvm", version = "3.0.5" }
-logback-classic = { module = "ch.qos.logback:logback-classic", version = "1.4.14" }
 
-protoc = { group = "com.google.protobuf", name = "protoc", version.ref = "protobuf" }
+[bundles]
+ktor-server = [
+    "ktor-server-core",
+    "ktor-server-netty",
+    "ktor-server-content-negotiation",
+    "ktor-server-auth",
+    "ktor-server-auth-jwt",
+    "ktor-server-websockets",
+    "ktor-server-sse",
+    "ktor-server-call-logging",
+    "ktor-server-metrics-micrometer",
+    "ktor-server-openapi",
+    "ktor-server-cors",
+    "ktor-server-compression"
+]
 
-protobuf-kotlin-lite = { group = "com.google.protobuf", name = "protobuf-kotlin-lite", version.ref = "protobuf" }
-protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protobuf" }
-protoc-gen-grpc-java = { group = "io.grpc", name = "protoc-gen-grpc-java", version.ref = "grpc" }
-protoc-gen-grpc-kotlin = { group = "io.grpc", name = "protoc-gen-grpc-kotlin", version.ref = "grpcKotlin" }
+kotlinx-libs = [
+    "kotlinx-coroutines-core",
+    "kotlinx-coroutines-jdk8",
+    "kotlinx-serialization-json",
+    "kotlinx-serialization-protobuf",
+    "kotlinx-datetime"
+]
 
+exposed-libs = [
+    "exposed-core",
+    "exposed-jdbc",
+    "exposed-dao",
+    "exposed-kotlin-datetime",
+    "exposed-migration"
+]
 
+database-libs = [
+    "postgresql",
+    "flyway-core",
+    "flyway-database-postgresql",
+    "hikaricp"
+]
 
-# Ktor
-ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
-ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
-ktor-server-contentNegotiation = { module = "io.ktor:ktor-server-content-negotiation-jvm", version.ref = "ktor" }
-ktor-serialization-kotlinxJson = { module = "io.ktor:ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
-ktor-server-requestValidation = { module = "io.ktor:ktor-server-request-validation", version.ref = "ktor" }
-ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
-ktor-server-statusPages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
-ktor-server-testHost = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
-ktor-client-contentNegotiation = { module = "io.ktor:ktor-client-content-negotiation-jvm", version.ref = "ktor" }
+koin-libs = [
+    "koin-core",
+    "koin-ktor",
+    "koin-logger-slf4j"
+]
 
-# Koin
-koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
-koin-ktor = { module = "io.insert-koin:koin-ktor", version.ref = "koin" }
-koin-loggerSlf4j = { module = "io.insert-koin:koin-logger-slf4j", version.ref = "koin" }
-koin-test = { module = "io.insert-koin:koin-test", version.ref = "koin" }
-koin-test-junit5 = { module = "io.insert-koin:koin-test-junit5", version.ref = "koin" }
+arrow-libs = [
+    "arrow-core",
+    "arrow-fx-coroutines"
+]
 
-# Kotest
-kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
-kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
+logging-libs = [
+    "logback-classic",
+    "kotlin-logging"
+]
 
-# MockK
-mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+observability-libs = [
+    "micrometer-core",
+    "micrometer-registry-prometheus",
+    "opentelemetry-api",
+    "opentelemetry-instrumentation-ktor"
+]
 
-# Mockito
-mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
-mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockitoKotlin" }
+grpc-libs = [
+    "grpc-netty-shaded",
+    "grpc-protobuf",
+    "grpc-kotlin-stub",
+    "grpc-services",
+    "protobuf-java",
+    "protobuf-kotlin"
+]
 
-# JUnit Jupiter
-junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junitJupiter" }
-junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junitJupiter" }
+security-libs = [
+    "auth0-jwt",
+    "jbcrypt"
+]
 
-# Database
-hikariCP = { module = "com.zaxxer:HikariCP", version.ref = "hikariCP" }
-postgresql-driver = { module = "org.postgresql:postgresql", version.ref = "postgresqlDriver" }
+testing-libs = [
+    "kotest-runner-junit5",
+    "kotest-assertions-core",
+    "kotest-property",
+    "kotest-framework-datatest",
+    "kotest-assertions-json",
+    "kotest-extensions-koin",
+    "mockk",
+    "testcontainers-junit-jupiter",
+    "testcontainers-postgresql",
+    "koin-test",
+    "ktor-server-test-host"
+]
 
-# Testcontainers
-testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
-testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainersJunitJupiter" }
-
-# Kubernetes
-kubernetes-client = { module = "io.kubernetes:client-java", version.ref = "kubernetesClient" }
-kubernetes-client-extended = { module = "io.kubernetes:client-java-extended", version.ref = "kubernetesClient" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
-ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradlePlugin" }
-protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
-osdetector = { id = "com.google.osdetector", version.ref = "osdetector" }
+protobuf = { id = "com.google.protobuf", version = "0.9.4" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }

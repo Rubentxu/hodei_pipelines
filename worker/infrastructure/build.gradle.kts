@@ -9,27 +9,32 @@ tasks.jar {
 }
 
 dependencies {
-    implementation(project(":worker:domain"))
-    implementation(project(":worker:application"))
-    implementation(project(":core:infrastructure"))
+    // Project dependencies
+    implementation(project(":worker:core"))
+    implementation(project(":shared:proto"))
     implementation(project(":pipeline-dsl:core"))
 
+    // gRPC dependencies
     implementation(libs.grpc.netty.shaded)
+    
+    // Kotlin scripting dependencies
     implementation(libs.kotlin.scripting.jvm)
     implementation(libs.kotlin.scripting.jvm.host)
     implementation(libs.kotlin.scripting.common)
     implementation(libs.kotlin.scripting.dependencies)
     implementation(libs.kotlin.compiler.embeddable)
+    
+    // Logging
     implementation(libs.kotlin.logging.jvm)
     implementation(libs.logback.classic)
     
-    testImplementation(libs.kotlin.test)
+    // Testing with kotest
+    testImplementation(libs.kotest.runner.junit5)
+    testImplementation(libs.kotest.assertions.core)
+    testImplementation(libs.kotest.property)
+    testImplementation(libs.kotest.framework.datatest)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.junit.jupiter.api)
-    testImplementation(libs.junit.jupiter.engine)
     testImplementation(libs.mockk)
-    testImplementation(libs.mockito.core)
-    testImplementation(libs.mockito.kotlin)
 }
 
 tasks.test {

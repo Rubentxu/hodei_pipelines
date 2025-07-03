@@ -10,17 +10,7 @@ dependencies {
     implementation("com.github.ajalt.clikt:clikt:4.2.2")
     implementation(libs.kotlinx.coroutines.core)
     
-    // Test dependencies
-    testImplementation(libs.junit.jupiter.api)
-    testImplementation(libs.junit.jupiter.engine)
-    testImplementation("org.junit.platform:junit-platform-suite-api:1.10.0")
-    testImplementation("org.junit.platform:junit-platform-launcher:1.10.0")
-    testImplementation(libs.mockk)
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.0")
-    
-    // Para tests de integración
-    testImplementation("org.junit.platform:junit-platform-engine:1.10.0")
-    testImplementation("org.junit.platform:junit-platform-commons:1.10.0")
+
 }
 
 application {

@@ -1,4 +1,4 @@
-package dev.rubentxu.hodei.pipelines.worker.application
+package dev.rubentxu.hodei.pipelines.infrastructure.application
 
 import dev.rubentxu.hodei.pipelines.infrastructure.script.PipelineScriptExecutor
 import dev.rubentxu.hodei.pipelines.infrastructure.worker.PipelineWorker

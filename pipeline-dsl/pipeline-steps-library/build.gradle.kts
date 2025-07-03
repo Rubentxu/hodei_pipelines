@@ -6,7 +6,6 @@ plugins {
 
 dependencies {
     implementation(project(":pipeline-dsl:core"))
-    implementation(project(":core:domain"))
     
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")

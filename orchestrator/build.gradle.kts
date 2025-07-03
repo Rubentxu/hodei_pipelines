@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktor)
-    alias(libs.plugins.protobuf)
 }
 
 group = "dev.rubentxu.hodei"
@@ -17,6 +16,9 @@ repositories {
 }
 
 dependencies {
+    // Shared proto module
+    implementation(project(":shared:proto"))
+    
     // Ktor Server Bundle
     implementation(libs.bundles.ktor.server)
     implementation(libs.ktor.serialization.kotlinx.json)
@@ -97,27 +99,3 @@ tasks.register<Jar>("workerJar") {
     })
 }
 
-protobuf {
-    protoc {
-        artifact = "com.google.protobuf:protoc:4.28.2"
-    }
-    plugins {
-        create("grpc") {
-            artifact = "io.grpc:protoc-gen-grpc-java:1.66.0"
-        }
-        create("grpckt") {
-            artifact = "io.grpc:protoc-gen-grpc-kotlin:1.4.1:jdk8@jar"
-        }
-    }
-    generateProtoTasks {
-        all().forEach {
-            it.plugins {
-                create("grpc")
-                create("grpckt")
-            }
-            it.builtins {
-                create("kotlin")
-            }
-        }
-    }
-}
