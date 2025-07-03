@@ -1,0 +1,15 @@
+WebhookIdParam:
+  name: webhookId
+  in: path
+  required: true
+  description: Unique webhook identifier
+  schema:
+    type: string
+
+DeliveryIdParam:
+  name: deliveryId
+  in: path
+  required: true
+  description: Unique delivery identifier
+  schema:
+    type: string

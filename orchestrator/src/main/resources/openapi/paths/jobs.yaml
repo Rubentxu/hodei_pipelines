@@ -1,0 +1,256 @@
+paths:
+  /jobs:
+    get:
+      tags: [Jobs]
+      summary: List jobs
+      description: |
+        Retrieve a paginated list of jobs with optional filtering by status, template, and other criteria.
+      operationId: listJobs
+      parameters:
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+        - $ref: '../parameters/common.yaml#/SortParam'
+        - name: status
+          in: query
+          description: Filter jobs by status
+          schema:
+            $ref: '../schemas/jobs.yaml#/JobStatus'
+        - name: template
+          in: query
+          description: Filter jobs by template ID
+          schema:
+            type: string
+        - name: priority
+          in: query
+          description: Filter jobs by priority
+          schema:
+            type: string
+            enum: [LOW, NORMAL, HIGH, CRITICAL]
+      responses:
+        '200':
+          description: Jobs retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/jobs.yaml#/JobListResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    post:
+      tags: [Jobs]
+      summary: Create ad-hoc job
+      description: |
+        Create a new ad-hoc job without using a template. The job content is provided directly.
+        
+        This endpoint automatically submits the job to the orchestrator for queuing and execution.
+        The job will go through the following flow:
+        1. Job is validated and created
+        2. Job is queued by the orchestrator
+        3. Scheduler decides resource pool placement
+        4. Execution engine provisions worker and executes job
+      operationId: createAdHocJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/jobs.yaml#/CreateAdHocJobRequest'
+      responses:
+        '201':
+          description: Job created and queued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/jobs.yaml#/Job'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /jobs/from-template:
+    post:
+      tags: [Jobs]
+      summary: Create job from template
+      description: |
+        Create a new job using an existing template. Parameters are validated against the template definition.
+        
+        This endpoint automatically submits the job to the orchestrator for queuing and execution.
+        The job will go through the following flow:
+        1. Job is validated and created from template
+        2. Job is queued by the orchestrator
+        3. Scheduler decides resource pool placement
+        4. Execution engine provisions worker and executes job
+      operationId: createJobFromTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/jobs.yaml#/CreateJobFromTemplateRequest'
+      responses:
+        '201':
+          description: Job created from template and queued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/jobs.yaml#/Job'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /jobs/{jobId}:
+    get:
+      tags: [Jobs]
+      summary: Get job details
+      description: |
+        Retrieve detailed information about a specific job, including its current status and execution history.
+      operationId: getJob
+      parameters:
+        - $ref: '../parameters/jobs.yaml#/JobIdParam'
+      responses:
+        '200':
+          description: Job details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/jobs.yaml#/Job'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    delete:
+      tags: [Jobs]
+      summary: Cancel job
+      description: |
+        Cancel a job. If the job is currently executing, it will be gracefully stopped.
+      operationId: cancelJob
+      parameters:
+        - $ref: '../parameters/jobs.yaml#/JobIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/jobs.yaml#/CancelJobRequest'
+      responses:
+        '204':
+          description: Job cancelled successfully
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /jobs/{jobId}/retry:
+    post:
+      tags: [Jobs]
+      summary: Retry failed job
+      description: |
+        Retry a failed job. Creates a new execution attempt with the same configuration.
+      operationId: retryJob
+      parameters:
+        - $ref: '../parameters/jobs.yaml#/JobIdParam'
+      responses:
+        '200':
+          description: Job retry initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/jobs.yaml#/Job'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /jobs/{jobId}/executions:
+    get:
+      tags: [Jobs]
+      summary: List job executions
+      description: |
+        Retrieve all executions for a specific job.
+      operationId: listJobExecutions
+      parameters:
+        - $ref: '../parameters/jobs.yaml#/JobIdParam'
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+      responses:
+        '200':
+          description: Executions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/executions.yaml#/ExecutionListResponse'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    post:
+      tags: [Jobs]
+      summary: Start job execution (Forbidden)
+      description: |
+        Direct job execution is no longer allowed. All jobs must be submitted through the 
+        POST /jobs endpoint which will automatically queue them for execution through the orchestrator.
+        
+        The execution flow is now:
+        1. Submit job via POST /jobs or POST /jobs/from-template
+        2. Job is queued by the orchestrator
+        3. Scheduler decides resource pool placement
+        4. Execution engine provisions worker and executes job
+        
+        This ensures proper resource management and scheduling.
+      operationId: startJobExecutionForbidden
+      deprecated: true
+      parameters:
+        - $ref: '../parameters/jobs.yaml#/JobIdParam'
+      responses:
+        '403':
+          description: Direct execution is forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                  - message
+                  - timestamp
+                properties:
+                  error:
+                    type: string
+                    example: "DIRECT_EXECUTION_FORBIDDEN"
+                  message:
+                    type: string
+                    example: "Direct job execution is not allowed. Please submit jobs through POST /jobs endpoint which will automatically queue them for execution."
+                  timestamp:
+                    type: string
+                    format: date-time
+                  traceId:
+                    type: string
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'

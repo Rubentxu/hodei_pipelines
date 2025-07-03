@@ -1,0 +1,520 @@
+openapi: 3.0.3
+info:
+  title: Hodei Pipelines API
+  description: |
+    Sistema de orquestación de jobs distribuidos de nivel empresarial.
+    
+    Hodei Pipelines proporciona una API REST completa para la gestión del ciclo de vida 
+    de jobs, plantillas, ejecuciones y recursos computacionales distribuidos.
+    
+    ## Flujo de Ejecución Obligatorio
+    
+    **IMPORTANTE**: La ejecución directa de jobs está prohibida. Todos los jobs DEBEN seguir este flujo:
+    
+    1. **Crear Job**: Use `POST /jobs` o `POST /jobs/from-template`
+    2. **Encolado Automático**: El job es automáticamente encolado por el orchestrator
+    3. **Scheduling**: El scheduler decide el resource pool óptimo
+    4. **Ejecución**: El execution engine provisiona workers y ejecuta el job
+    5. **Monitorización**: Use los endpoints de executions para seguir el progreso
+    
+    El endpoint `POST /jobs/{jobId}/executions` retorna **403 Forbidden** para garantizar este flujo.
+    
+    ## Autenticación
+    Todas las operaciones requieren autenticación mediante token Bearer:
+    ```
+    Authorization: Bearer <token>
+    ```
+    
+    ## Principios de Diseño
+    - **API-First**: Esta especificación es la fuente de verdad
+    - **RESTful**: Uso consistente de métodos HTTP y códigos de estado
+    - **Granular**: Control granular sobre recursos y permisos
+    - **Observable**: Streaming en tiempo real y consulta histórica
+    - **Seguro**: Flujo de ejecución protegido por diseño
+  version: 1.0.0
+  contact:
+    name: Hodei Pipelines Team
+    url: https://github.com/rubentxu/hodei-pipelines
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.hodei.dev/v1
+    description: Production server
+  - url: https://staging-api.hodei.dev/v1
+    description: Staging server
+  - url: http://localhost:8080/v1
+    description: Local development server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Templates
+    description: Gestión de plantillas reutilizables y versionadas
+  - name: Jobs
+    description: Gestión del ciclo de vida de trabajos
+  - name: Executions
+    description: Monitorización y control de ejecuciones
+  - name: Pools
+    description: Gestión de pools de recursos computacionales
+  - name: Workers
+    description: Gestión y monitorización de workers
+  - name: Admin
+    description: Operaciones administrativas y configuración
+  - name: Security
+    description: Gestión de identidad, acceso y auditoría
+  - name: Webhooks
+    description: Gestión de webhooks y notificaciones de eventos
+
+paths:
+  # Health Check
+  /health:
+    $ref: './paths/admin.yaml#/paths/~1health'
+  
+  # Metrics
+  /metrics:
+    $ref: './paths/admin.yaml#/paths/~1metrics'
+  
+  # Templates endpoints
+  /templates:
+    $ref: './paths/templates.yaml#/paths/~1templates'
+  /templates/validate:
+    $ref: './paths/templates.yaml#/paths/~1templates~1validate'
+  /templates/{templateId}:
+    $ref: './paths/templates.yaml#/paths/~1templates~1{templateId}'
+  /templates/{templateId}/publish:
+    $ref: './paths/templates.yaml#/paths/~1templates~1{templateId}~1publish'
+  
+  # Jobs endpoints
+  /jobs:
+    $ref: './paths/jobs.yaml#/paths/~1jobs'
+  /jobs/from-template:
+    $ref: './paths/jobs.yaml#/paths/~1jobs~1from-template'
+  /jobs/{jobId}:
+    $ref: './paths/jobs.yaml#/paths/~1jobs~1{jobId}'
+  /jobs/{jobId}/retry:
+    $ref: './paths/jobs.yaml#/paths/~1jobs~1{jobId}~1retry'
+  /jobs/{jobId}/executions:
+    $ref: './paths/jobs.yaml#/paths/~1jobs~1{jobId}~1executions'
+  
+  # Executions endpoints
+  /executions:
+    $ref: './paths/executions.yaml#/paths/~1executions'
+  /executions/{executionId}:
+    $ref: './paths/executions.yaml#/paths/~1executions~1{executionId}'
+  /executions/{executionId}/logs:
+    $ref: './paths/executions.yaml#/paths/~1executions~1{executionId}~1logs'
+  /executions/{executionId}/logs/stream:
+    $ref: './paths/executions.yaml#/paths/~1executions~1{executionId}~1logs~1stream'
+  /executions/{executionId}/events:
+    $ref: './paths/executions.yaml#/paths/~1executions~1{executionId}~1events'
+  /executions/{executionId}/events/stream:
+    $ref: './paths/executions.yaml#/paths/~1executions~1{executionId}~1events~1stream'
+  /executions/{executionId}/replay:
+    $ref: './paths/executions.yaml#/paths/~1executions~1{executionId}~1replay'
+  /executions/{executionId}/subscribe:
+    $ref: './paths/executions.yaml#/paths/~1executions~1{executionId}~1subscribe'
+  
+  # Pools endpoints
+  /pools:
+    $ref: './paths/pools.yaml#/paths/~1pools'
+  /pools/{poolId}:
+    $ref: './paths/pools.yaml#/paths/~1pools~1{poolId}'
+  /pools/{poolId}/drain:
+    $ref: './paths/pools.yaml#/paths/~1pools~1{poolId}~1drain'
+  /pools/{poolId}/resume:
+    $ref: './paths/pools.yaml#/paths/~1pools~1{poolId}~1resume'
+  /pools/{poolId}/maintenance:
+    $ref: './paths/pools.yaml#/paths/~1pools~1{poolId}~1maintenance'
+  /pools/{poolId}/quotas:
+    $ref: './paths/pools.yaml#/paths/~1pools~1{poolId}~1quotas'
+  /pools/{poolId}/quotas/{quotaId}:
+    $ref: './paths/pools.yaml#/paths/~1pools~1{poolId}~1quotas~1{quotaId}'
+  /pools/{poolId}/metrics:
+    $ref: './paths/pools.yaml#/paths/~1pools~1{poolId}~1metrics'
+  /pools/{poolId}/workers:
+    $ref: './paths/pools.yaml#/paths/~1pools~1{poolId}~1workers'
+  
+  # Workers endpoints
+  /workers:
+    $ref: './paths/workers.yaml#/paths/~1workers'
+  /workers/{workerId}:
+    $ref: './paths/workers.yaml#/paths/~1workers~1{workerId}'
+  /workers/{workerId}/drain:
+    $ref: './paths/workers.yaml#/paths/~1workers~1{workerId}~1drain'
+  /workers/{workerId}/maintenance:
+    $ref: './paths/workers.yaml#/paths/~1workers~1{workerId}~1maintenance'
+  /workers/{workerId}/logs:
+    $ref: './paths/workers.yaml#/paths/~1workers~1{workerId}~1logs'
+  /workers/{workerId}/metrics:
+    $ref: './paths/workers.yaml#/paths/~1workers~1{workerId}~1metrics'
+  
+  # Authentication endpoints
+  /auth/login:
+    $ref: './paths/auth.yaml#/paths/~1auth~1login'
+  /auth/refresh:
+    $ref: './paths/auth.yaml#/paths/~1auth~1refresh'
+  /auth/logout:
+    $ref: './paths/auth.yaml#/paths/~1auth~1logout'
+  /auth/me:
+    $ref: './paths/auth.yaml#/paths/~1auth~1me'
+  /auth/permissions:
+    $ref: './paths/auth.yaml#/paths/~1auth~1permissions'
+  /auth/sessions:
+    $ref: './paths/auth.yaml#/paths/~1auth~1sessions'
+  /auth/sessions/{sessionId}:
+    $ref: './paths/auth.yaml#/paths/~1auth~1sessions~1{sessionId}'
+  /auth/password/change:
+    $ref: './paths/auth.yaml#/paths/~1auth~1password~1change'
+  /auth/password/reset:
+    $ref: './paths/auth.yaml#/paths/~1auth~1password~1reset'
+  /auth/password/reset/confirm:
+    $ref: './paths/auth.yaml#/paths/~1auth~1password~1reset~1confirm'
+  
+  # Webhooks endpoints
+  /webhooks:
+    $ref: './paths/webhooks.yaml#/paths/~1webhooks'
+  /webhooks/{webhookId}:
+    $ref: './paths/webhooks.yaml#/paths/~1webhooks~1{webhookId}'
+  /webhooks/{webhookId}/test:
+    $ref: './paths/webhooks.yaml#/paths/~1webhooks~1{webhookId}~1test'
+  /webhooks/{webhookId}/deliveries:
+    $ref: './paths/webhooks.yaml#/paths/~1webhooks~1{webhookId}~1deliveries'
+  /webhooks/{webhookId}/deliveries/{deliveryId}:
+    $ref: './paths/webhooks.yaml#/paths/~1webhooks~1{webhookId}~1deliveries~1{deliveryId}'
+  /webhooks/{webhookId}/deliveries/{deliveryId}/retry:
+    $ref: './paths/webhooks.yaml#/paths/~1webhooks~1{webhookId}~1deliveries~1{deliveryId}~1retry'
+  /webhook-events:
+    $ref: './paths/webhooks.yaml#/paths/~1webhook-events'
+  /websocket/info:
+    $ref: './paths/webhooks.yaml#/paths/~1websocket~1info'
+  
+  # WebSocket endpoints
+  /ws/executions/{executionId}/stream:
+    $ref: './paths/executions.yaml#/paths/~1ws~1executions~1{executionId}~1stream'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de autenticación JWT o API token
+
+  parameters:
+    # Common Parameters
+    PageParam:
+      $ref: './parameters/common.yaml#/PageParam'
+    SizeParam:
+      $ref: './parameters/common.yaml#/SizeParam'
+    SortParam:
+      $ref: './parameters/common.yaml#/SortParam'
+    
+    # Resource-specific Parameters
+    TemplateIdParam:
+      $ref: './parameters/templates.yaml#/TemplateIdParam'
+    JobIdParam:
+      $ref: './parameters/jobs.yaml#/JobIdParam'
+    ExecutionIdParam:
+      $ref: './parameters/executions.yaml#/ExecutionIdParam'
+    PoolIdParam:
+      $ref: './parameters/pools.yaml#/PoolIdParam'
+    QuotaIdParam:
+      $ref: './parameters/pools.yaml#/QuotaIdParam'
+    
+    # Worker Parameters
+    WorkerIdParam:
+      $ref: './parameters/workers.yaml#/WorkerIdParam'
+    
+    # Auth Parameters
+    SessionIdParam:
+      $ref: './parameters/auth.yaml#/SessionIdParam'
+    UserIdParam:
+      $ref: './parameters/auth.yaml#/UserIdParam'
+    GroupIdParam:
+      $ref: './parameters/auth.yaml#/GroupIdParam'
+    RoleIdParam:
+      $ref: './parameters/auth.yaml#/RoleIdParam'
+    ServiceAccountIdParam:
+      $ref: './parameters/auth.yaml#/ServiceAccountIdParam'
+    TokenIdParam:
+      $ref: './parameters/auth.yaml#/TokenIdParam'
+    
+    # Webhook Parameters
+    WebhookIdParam:
+      $ref: './parameters/webhooks.yaml#/WebhookIdParam'
+    DeliveryIdParam:
+      $ref: './parameters/webhooks.yaml#/DeliveryIdParam'
+
+  schemas:
+    # Common Schemas
+    ErrorResponse:
+      $ref: './schemas/common.yaml#/ErrorResponse'
+    PaginationMeta:
+      $ref: './schemas/common.yaml#/PaginationMeta'
+    HealthStatus:
+      $ref: './schemas/common.yaml#/HealthStatus'
+    ComponentHealth:
+      $ref: './schemas/common.yaml#/ComponentHealth'
+    ResourceRequirements:
+      $ref: './schemas/common.yaml#/ResourceRequirements'
+    ResourceUsage:
+      $ref: './schemas/common.yaml#/ResourceUsage'
+    NetworkUsage:
+      $ref: './schemas/common.yaml#/NetworkUsage'
+    DiskUsage:
+      $ref: './schemas/common.yaml#/DiskUsage'
+    
+    # Template Schemas
+    TemplateStatus:
+      $ref: './schemas/templates.yaml#/TemplateStatus'
+    Template:
+      $ref: './schemas/templates.yaml#/Template'
+    TemplateContent:
+      $ref: './schemas/templates.yaml#/TemplateContent'
+    TemplateParameter:
+      $ref: './schemas/templates.yaml#/TemplateParameter'
+    ParameterValidation:
+      $ref: './schemas/templates.yaml#/ParameterValidation'
+    CreateTemplateRequest:
+      $ref: './schemas/templates.yaml#/CreateTemplateRequest'
+    UpdateTemplateRequest:
+      $ref: './schemas/templates.yaml#/UpdateTemplateRequest'
+    ValidateTemplateRequest:
+      $ref: './schemas/templates.yaml#/ValidateTemplateRequest'
+    ValidationResult:
+      $ref: './schemas/templates.yaml#/ValidationResult'
+    ValidationError:
+      $ref: './schemas/templates.yaml#/ValidationError'
+    ValidationWarning:
+      $ref: './schemas/templates.yaml#/ValidationWarning'
+    TemplateListResponse:
+      $ref: './schemas/templates.yaml#/TemplateListResponse'
+    
+    # Job Schemas
+    JobStatus:
+      $ref: './schemas/jobs.yaml#/JobStatus'
+    Job:
+      $ref: './schemas/jobs.yaml#/Job'
+    JobContent:
+      $ref: './schemas/jobs.yaml#/JobContent'
+    RetryPolicy:
+      $ref: './schemas/jobs.yaml#/RetryPolicy'
+    ExecutionReference:
+      $ref: './schemas/jobs.yaml#/ExecutionReference'
+    CreateAdHocJobRequest:
+      $ref: './schemas/jobs.yaml#/CreateAdHocJobRequest'
+    CreateJobFromTemplateRequest:
+      $ref: './schemas/jobs.yaml#/CreateJobFromTemplateRequest'
+    CancelJobRequest:
+      $ref: './schemas/jobs.yaml#/CancelJobRequest'
+    JobListResponse:
+      $ref: './schemas/jobs.yaml#/JobListResponse'
+    
+    # Execution Schemas
+    ExecutionStatus:
+      $ref: './schemas/executions.yaml#/ExecutionStatus'
+    Execution:
+      $ref: './schemas/executions.yaml#/Execution'
+    ExecutionResult:
+      $ref: './schemas/executions.yaml#/ExecutionResult'
+    ExecutionError:
+      $ref: './schemas/executions.yaml#/ExecutionError'
+    ExecutionMetrics:
+      $ref: './schemas/executions.yaml#/ExecutionMetrics'
+    StageExecution:
+      $ref: './schemas/executions.yaml#/StageExecution'
+    StepExecution:
+      $ref: './schemas/executions.yaml#/StepExecution'
+    ArtifactReference:
+      $ref: './schemas/executions.yaml#/ArtifactReference'
+    LogStream:
+      $ref: './schemas/executions.yaml#/LogStream'
+    LogEntry:
+      $ref: './schemas/executions.yaml#/LogEntry'
+    LogResponse:
+      $ref: './schemas/executions.yaml#/LogResponse'
+    EventType:
+      $ref: './schemas/executions.yaml#/EventType'
+    ExecutionEvent:
+      $ref: './schemas/executions.yaml#/ExecutionEvent'
+    EventResponse:
+      $ref: './schemas/executions.yaml#/EventResponse'
+    ExecutionReplay:
+      $ref: './schemas/executions.yaml#/ExecutionReplay'
+    TimelineEntry:
+      $ref: './schemas/executions.yaml#/TimelineEntry'
+    CancelExecutionRequest:
+      $ref: './schemas/executions.yaml#/CancelExecutionRequest'
+    ExecutionListResponse:
+      $ref: './schemas/executions.yaml#/ExecutionListResponse'
+    
+    # Pool Schemas
+    PoolStatus:
+      $ref: './schemas/pools.yaml#/PoolStatus'
+    PoolType:
+      $ref: './schemas/pools.yaml#/PoolType'
+    Pool:
+      $ref: './schemas/pools.yaml#/Pool'
+    PoolConfiguration:
+      $ref: './schemas/pools.yaml#/PoolConfiguration'
+    AutoScalingConfig:
+      $ref: './schemas/pools.yaml#/AutoScalingConfig'
+    NetworkingConfig:
+      $ref: './schemas/pools.yaml#/NetworkingConfig'
+    SecurityConfig:
+      $ref: './schemas/pools.yaml#/SecurityConfig'
+    MonitoringConfig:
+      $ref: './schemas/pools.yaml#/MonitoringConfig'
+    AlertingConfig:
+      $ref: './schemas/pools.yaml#/AlertingConfig'
+    ProvisionerConfig:
+      $ref: './schemas/pools.yaml#/ProvisionerConfig'
+    PoolCapacity:
+      $ref: './schemas/pools.yaml#/PoolCapacity'
+    PoolResources:
+      $ref: './schemas/pools.yaml#/PoolResources'
+    ResourceCapacity:
+      $ref: './schemas/pools.yaml#/ResourceCapacity'
+    PoolStatistics:
+      $ref: './schemas/pools.yaml#/PoolStatistics'
+    WorkerStatus:
+      $ref: './schemas/pools.yaml#/WorkerStatus'
+    Worker:
+      $ref: './schemas/pools.yaml#/Worker'
+    WorkerCapabilities:
+      $ref: './schemas/pools.yaml#/WorkerCapabilities'
+    WorkerResources:
+      $ref: './schemas/pools.yaml#/WorkerResources'
+    QuotaPolicy:
+      $ref: './schemas/pools.yaml#/QuotaPolicy'
+    Quota:
+      $ref: './schemas/pools.yaml#/Quota'
+    QuotaLimits:
+      $ref: './schemas/pools.yaml#/QuotaLimits'
+    QuotaUsage:
+      $ref: './schemas/pools.yaml#/QuotaUsage'
+    CreatePoolRequest:
+      $ref: './schemas/pools.yaml#/CreatePoolRequest'
+    UpdatePoolRequest:
+      $ref: './schemas/pools.yaml#/UpdatePoolRequest'
+    DrainPoolRequest:
+      $ref: './schemas/pools.yaml#/DrainPoolRequest'
+    MaintenanceRequest:
+      $ref: './schemas/pools.yaml#/MaintenanceRequest'
+    CreateQuotaRequest:
+      $ref: './schemas/pools.yaml#/CreateQuotaRequest'
+    UpdateQuotaRequest:
+      $ref: './schemas/pools.yaml#/UpdateQuotaRequest'
+    PoolListResponse:
+      $ref: './schemas/pools.yaml#/PoolListResponse'
+    WorkerListResponse:
+      $ref: './schemas/pools.yaml#/WorkerListResponse'
+    QuotaListResponse:
+      $ref: './schemas/pools.yaml#/QuotaListResponse'
+    
+    # Worker-specific Schemas (avoiding conflicts with pools.yaml)
+    TerminateWorkerRequest:
+      $ref: './schemas/workers.yaml#/TerminateWorkerRequest'
+    DrainWorkerRequest:
+      $ref: './schemas/workers.yaml#/DrainWorkerRequest'
+    WorkerMaintenanceRequest:
+      $ref: './schemas/workers.yaml#/MaintenanceRequest'
+    WorkerLogResponse:
+      $ref: './schemas/workers.yaml#/LogResponse'
+    StandaloneWorkerListResponse:
+      $ref: './schemas/workers.yaml#/WorkerListResponse'
+    
+    # Auth Schemas
+    LoginRequest:
+      $ref: './schemas/auth.yaml#/LoginRequest'
+    LoginResponse:
+      $ref: './schemas/auth.yaml#/LoginResponse'
+    RefreshTokenRequest:
+      $ref: './schemas/auth.yaml#/RefreshTokenRequest'
+    RefreshTokenResponse:
+      $ref: './schemas/auth.yaml#/RefreshTokenResponse'
+    LogoutRequest:
+      $ref: './schemas/auth.yaml#/LogoutRequest'
+    User:
+      $ref: './schemas/auth.yaml#/User'
+    Permission:
+      $ref: './schemas/auth.yaml#/Permission'
+    PermissionsResponse:
+      $ref: './schemas/auth.yaml#/PermissionsResponse'
+    Session:
+      $ref: './schemas/auth.yaml#/Session'
+    SessionListResponse:
+      $ref: './schemas/auth.yaml#/SessionListResponse'
+    ChangePasswordRequest:
+      $ref: './schemas/auth.yaml#/ChangePasswordRequest'
+    PasswordResetRequest:
+      $ref: './schemas/auth.yaml#/PasswordResetRequest'
+    PasswordResetConfirmRequest:
+      $ref: './schemas/auth.yaml#/PasswordResetConfirmRequest'
+    Role:
+      $ref: './schemas/auth.yaml#/Role'
+    Group:
+      $ref: './schemas/auth.yaml#/Group'
+    ServiceAccount:
+      $ref: './schemas/auth.yaml#/ServiceAccount'
+    ApiToken:
+      $ref: './schemas/auth.yaml#/ApiToken'
+    
+    # Webhook Schemas
+    WebhookStatus:
+      $ref: './schemas/webhooks.yaml#/WebhookStatus'
+    WebhookEventType:
+      $ref: './schemas/webhooks.yaml#/WebhookEventType'
+    Webhook:
+      $ref: './schemas/webhooks.yaml#/Webhook'
+    WebhookRetryPolicy:
+      $ref: './schemas/webhooks.yaml#/WebhookRetryPolicy'
+    WebhookFilters:
+      $ref: './schemas/webhooks.yaml#/WebhookFilters'
+    WebhookStatistics:
+      $ref: './schemas/webhooks.yaml#/WebhookStatistics'
+    WebhookDelivery:
+      $ref: './schemas/webhooks.yaml#/WebhookDelivery'
+    WebhookEventPayload:
+      $ref: './schemas/webhooks.yaml#/WebhookEventPayload'
+    JobEventData:
+      $ref: './schemas/webhooks.yaml#/JobEventData'
+    ExecutionEventData:
+      $ref: './schemas/webhooks.yaml#/ExecutionEventData'
+    TemplateEventData:
+      $ref: './schemas/webhooks.yaml#/TemplateEventData'
+    PoolEventData:
+      $ref: './schemas/webhooks.yaml#/PoolEventData'
+    WorkerEventData:
+      $ref: './schemas/webhooks.yaml#/WorkerEventData'
+    SystemEventData:
+      $ref: './schemas/webhooks.yaml#/SystemEventData'
+    CreateWebhookRequest:
+      $ref: './schemas/webhooks.yaml#/CreateWebhookRequest'
+    UpdateWebhookRequest:
+      $ref: './schemas/webhooks.yaml#/UpdateWebhookRequest'
+    TestWebhookRequest:
+      $ref: './schemas/webhooks.yaml#/TestWebhookRequest'
+    TestWebhookResponse:
+      $ref: './schemas/webhooks.yaml#/TestWebhookResponse'
+    WebhookListResponse:
+      $ref: './schemas/webhooks.yaml#/WebhookListResponse'
+    WebhookDeliveryListResponse:
+      $ref: './schemas/webhooks.yaml#/WebhookDeliveryListResponse'
+
+  responses:
+    BadRequest:
+      $ref: './responses/common.yaml#/BadRequest'
+    Unauthorized:
+      $ref: './responses/common.yaml#/Unauthorized'
+    Forbidden:
+      $ref: './responses/common.yaml#/Forbidden'
+    NotFound:
+      $ref: './responses/common.yaml#/NotFound'
+    Conflict:
+      $ref: './responses/common.yaml#/Conflict'
+    InternalServerError:
+      $ref: './responses/common.yaml#/InternalServerError'

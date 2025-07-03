@@ -1,0 +1,323 @@
+package dev.rubentxu.hodei.infrastructure.api.streaming
+
+import dev.rubentxu.hodei.application.services.ExecutionEngineService
+import dev.rubentxu.hodei.domain.common.DomainId
+import dev.rubentxu.hodei.domain.execution.*
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.server.sse.*
+import io.ktor.server.websocket.*
+import io.ktor.websocket.*
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlinx.coroutines.flow.*
+import kotlinx.datetime.Clock
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.time.Duration
+import io.github.oshai.kotlinlogging.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
+
+fun Application.configureExecutionStreaming(executionEngineService: ExecutionEngineService) {
+    
+    install(WebSockets) {
+        pingPeriod = Duration.ofSeconds(15)
+        timeout = Duration.ofSeconds(15)
+        maxFrameSize = Long.MAX_VALUE
+        masking = false
+    }
+    
+    install(SSE)
+    
+    routing {
+        // WebSocket endpoint for execution streaming
+        webSocket("/api/v1/executions/{executionId}/stream") {
+            val executionId = call.parameters["executionId"]
+            if (executionId == null) {
+                close(CloseReason(CloseReason.Codes.UNSUPPORTED_DATA, "Missing execution ID"))
+                return@webSocket
+            }
+            
+            logger.info { "WebSocket connection established for execution $executionId" }
+            
+            try {
+                // Send initial connection message
+                send(Json.encodeToString(mapOf(
+                    "type" to "connection",
+                    "message" to "Connected to execution $executionId",
+                    "timestamp" to Clock.System.now().toString()
+                )))
+                
+                // Stream events and logs
+                val eventFlow = executionEngineService.getExecutionEvents()
+                    .filter { it.aggregateId.value == executionId }
+                    .map { event ->
+                        Json.encodeToString(mapOf(
+                            "type" to "event",
+                            "data" to event,
+                            "timestamp" to Clock.System.now().toString()
+                        ))
+                    }
+                
+                val logFlow = executionEngineService.getExecutionLogs()
+                    .filter { it.executionId.value == executionId }
+                    .map { log ->
+                        Json.encodeToString(mapOf(
+                            "type" to "log",
+                            "data" to log,
+                            "timestamp" to Clock.System.now().toString()
+                        ))
+                    }
+                
+                // Merge both flows and send to client
+                merge(eventFlow, logFlow).collect { message ->
+                    send(message)
+                }
+                
+            } catch (e: ClosedReceiveChannelException) {
+                logger.info { "WebSocket connection closed for execution $executionId" }
+            } catch (e: Throwable) {
+                logger.error(e) { "Error in WebSocket for execution $executionId" }
+            } finally {
+                logger.info { "WebSocket cleanup for execution $executionId" }
+            }
+        }
+        
+        // SSE endpoint for execution streaming
+        sse("/api/v1/executions/{executionId}/stream/sse") {
+            val executionId = call.parameters["executionId"]
+            if (executionId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Missing execution ID")
+                return@sse
+            }
+            
+            logger.info { "SSE connection established for execution $executionId" }
+            
+            try {
+                // Send initial connection event
+                send(ServerSentEvent(
+                    data = Json.encodeToString(mapOf(
+                        "type" to "connection",
+                        "message" to "Connected to execution $executionId",
+                        "timestamp" to Clock.System.now().toString()
+                    )),
+                    event = "connection",
+                    id = Clock.System.now().toEpochMilliseconds().toString()
+                ))
+                
+                // Stream events
+                val eventFlow = executionEngineService.getExecutionEvents()
+                    .filter { it.aggregateId.value == executionId }
+                    .map { event ->
+                        ServerSentEvent(
+                            data = Json.encodeToString(event),
+                            event = "execution-event",
+                            id = event.eventId.value
+                        )
+                    }
+                
+                // Stream logs
+                val logFlow = executionEngineService.getExecutionLogs()
+                    .filter { it.executionId.value == executionId }
+                    .map { log ->
+                        ServerSentEvent(
+                            data = Json.encodeToString(log),
+                            event = "execution-log",
+                            id = log.id.value
+                        )
+                    }
+                
+                // Merge both flows and send to client
+                merge(eventFlow, logFlow).collect { event ->
+                    send(event)
+                }
+                
+            } catch (e: Throwable) {
+                logger.error(e) { "Error in SSE for execution $executionId" }
+            } finally {
+                logger.info { "SSE cleanup for execution $executionId" }
+            }
+        }
+        
+        // General events stream (all executions)
+        sse("/api/v1/stream/events") {
+            logger.info { "Global events SSE connection established" }
+            
+            try {
+                executionEngineService.getExecutionEvents()
+                    .map { event ->
+                        ServerSentEvent(
+                            data = Json.encodeToString(event),
+                            event = "execution-event",
+                            id = event.eventId.value
+                        )
+                    }
+                    .collect { event ->
+                        send(event)
+                    }
+            } catch (e: Throwable) {
+                logger.error(e) { "Error in global events SSE" }
+            }
+        }
+        
+        // General logs stream (all executions)
+        sse("/api/v1/stream/logs") {
+            logger.info { "Global logs SSE connection established" }
+            
+            try {
+                executionEngineService.getExecutionLogs()
+                    .map { log ->
+                        ServerSentEvent(
+                            data = Json.encodeToString(log),
+                            event = "execution-log", 
+                            id = log.id.value
+                        )
+                    }
+                    .collect { event ->
+                        send(event)
+                    }
+            } catch (e: Throwable) {
+                logger.error(e) { "Error in global logs SSE" }
+            }
+        }
+        
+        // Execution timeline endpoint
+        get("/api/v1/executions/{executionId}/timeline") {
+            val executionId = call.parameters["executionId"]
+            if (executionId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Missing execution ID")
+                return@get
+            }
+            
+            val context = executionEngineService.getExecutionContext(DomainId(executionId))
+            if (context == null) {
+                call.respond(HttpStatusCode.NotFound, "Execution not found")
+                return@get
+            }
+            
+            // Return timeline of events for this execution
+            val timeline = mapOf(
+                "executionId" to executionId,
+                "events" to context.events.sortedBy { it.timestamp },
+                "logs" to context.logs.sortedBy { it.timestamp },
+                "execution" to context.execution,
+                "job" to context.job
+            )
+            
+            call.respond(HttpStatusCode.OK, timeline)
+        }
+        
+        // Active executions status
+        get("/api/v1/executions/active") {
+            val activeExecutions = executionEngineService.getActiveExecutions()
+                .map { context ->
+                    mapOf(
+                        "executionId" to context.execution.id.value,
+                        "jobId" to context.job.id.value,
+                        "jobName" to context.job.name,
+                        "status" to context.execution.status.name,
+                        "workerId" to context.workerId,
+                        "startedAt" to context.execution.startedAt?.toString(),
+                        "eventCount" to context.events.size,
+                        "logCount" to context.logs.size
+                    )
+                }
+            
+            call.respond(HttpStatusCode.OK, mapOf(
+                "activeExecutions" to activeExecutions,
+                "count" to activeExecutions.size,
+                "timestamp" to Clock.System.now().toString()
+            ))
+        }
+        
+        // Execution replay endpoint - full history
+        get("/api/v1/executions/{executionId}/replay") {
+            val executionId = call.parameters["executionId"]
+            if (executionId == null) {
+                call.respond(HttpStatusCode.BadRequest, "Missing execution ID")
+                return@get
+            }
+            
+            val context = executionEngineService.getExecutionContext(DomainId(executionId))
+            if (context == null) {
+                call.respond(HttpStatusCode.NotFound, "Execution not found")
+                return@get
+            }
+            
+            // Return complete replay data for post-mortem analysis
+            val replayData = mapOf(
+                "execution" to context.execution,
+                "job" to context.job,
+                "workerId" to context.workerId,
+                "events" to context.events.sortedBy { it.timestamp },
+                "logs" to context.logs.sortedBy { it.timestamp },
+                "timeline" to buildTimeline(context.events, context.logs),
+                "statistics" to buildExecutionStatistics(context),
+                "generatedAt" to Clock.System.now().toString()
+            )
+            
+            call.respond(HttpStatusCode.OK, replayData)
+        }
+    }
+}
+
+private fun buildTimeline(events: List<dev.rubentxu.hodei.domain.execution.ExecutionEvent>, logs: List<ExecutionLog>): List<Map<String, Any>> {
+    val timeline = mutableListOf<Map<String, Any>>()
+    
+    // Add events to timeline
+    events.forEach { event ->
+        timeline.add(mapOf(
+            "timestamp" to event.timestamp.toString(),
+            "type" to "event",
+            "eventType" to event.eventType,
+            "data" to event
+        ))
+    }
+    
+    // Add logs to timeline
+    logs.forEach { log ->
+        timeline.add(mapOf(
+            "timestamp" to log.timestamp.toString(),
+            "type" to "log",
+            "level" to log.level.name,
+            "stream" to log.stream.name,
+            "message" to log.message,
+            "data" to log
+        ))
+    }
+    
+    return timeline.sortedBy { it["timestamp"] as String }.map { it as Map<String, Any> }
+}
+
+private fun buildExecutionStatistics(context: ExecutionEngineService.ExecutionContext): Map<String, Any> {
+    val events = context.events
+    val logs = context.logs
+    val execution = context.execution
+    
+    val stageEvents = events.filterIsInstance<dev.rubentxu.hodei.domain.execution.StageStarted>()
+    val stepEvents = events.filterIsInstance<dev.rubentxu.hodei.domain.execution.StepStarted>()
+    val failedSteps = events.filterIsInstance<dev.rubentxu.hodei.domain.execution.StepFailed>()
+    val completedSteps = events.filterIsInstance<dev.rubentxu.hodei.domain.execution.StepCompleted>()
+    
+    return mapOf(
+        "totalEvents" to events.size,
+        "totalLogs" to logs.size,
+        "totalStages" to stageEvents.size,
+        "totalSteps" to stepEvents.size,
+        "failedSteps" to failedSteps.size,
+        "completedSteps" to completedSteps.size,
+        "successRate" to if (stepEvents.isNotEmpty()) {
+            completedSteps.size.toDouble() / stepEvents.size.toDouble()
+        } else 0.0,
+        "status" to execution.status.name,
+        "duration" to execution.completedAt?.let { completed ->
+            execution.startedAt?.let { started ->
+                completed.toEpochMilliseconds() - started.toEpochMilliseconds()
+            }
+        },
+        "errorLogs" to logs.count { it.level == LogLevel.ERROR },
+        "warningLogs" to logs.count { it.level == LogLevel.WARN }
+    )
+}

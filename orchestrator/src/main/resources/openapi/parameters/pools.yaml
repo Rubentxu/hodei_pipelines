@@ -1,0 +1,19 @@
+PoolIdParam:
+  name: poolId
+  in: path
+  required: true
+  description: ID único del pool de recursos
+  schema:
+    type: string
+    format: uuid
+    example: "789e0123-e89b-12d3-a456-426614174002"
+
+QuotaIdParam:
+  name: quotaId
+  in: path
+  required: true
+  description: ID único de la quota
+  schema:
+    type: string
+    format: uuid
+    example: "quota-567-890-123"

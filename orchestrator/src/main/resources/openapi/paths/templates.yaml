@@ -1,0 +1,188 @@
+paths:
+  /templates:
+    get:
+      tags: [Templates]
+      summary: Listar plantillas
+      description: Obtiene una lista paginada de plantillas con filtros opcionales
+      operationId: listTemplates
+      parameters:
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+        - $ref: '../parameters/common.yaml#/SortParam'
+        - name: status
+          in: query
+          description: Filtrar por estado de la plantilla
+          schema:
+            $ref: '../schemas/templates.yaml#/TemplateStatus'
+        - name: search
+          in: query
+          description: Búsqueda por nombre o descripción
+          schema:
+            type: string
+            example: "build-pipeline"
+      responses:
+        '200':
+          description: Lista de plantillas
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/templates.yaml#/TemplateListResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '403':
+          $ref: '../responses/common.yaml#/Forbidden'
+
+    post:
+      tags: [Templates]
+      summary: Crear nueva plantilla
+      description: Crea una nueva plantilla en estado draft
+      operationId: createTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/templates.yaml#/CreateTemplateRequest'
+      responses:
+        '201':
+          description: Plantilla creada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/templates.yaml#/Template'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '403':
+          $ref: '../responses/common.yaml#/Forbidden'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+
+  /templates/validate:
+    post:
+      tags: [Templates]
+      summary: Validar plantilla
+      description: Valida la sintaxis y estructura de una plantilla sin guardarla
+      operationId: validateTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/templates.yaml#/ValidateTemplateRequest'
+      responses:
+        '200':
+          description: Plantilla válida
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/templates.yaml#/ValidationResult'
+        '400':
+          description: Plantilla inválida
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/templates.yaml#/ValidationResult'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+
+  /templates/{templateId}:
+    get:
+      tags: [Templates]
+      summary: Obtener plantilla por ID
+      description: Obtiene los detalles de una plantilla específica
+      operationId: getTemplate
+      parameters:
+        - $ref: '../parameters/templates.yaml#/TemplateIdParam'
+      responses:
+        '200':
+          description: Detalles de la plantilla
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/templates.yaml#/Template'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '403':
+          $ref: '../responses/common.yaml#/Forbidden'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+
+    put:
+      tags: [Templates]
+      summary: Actualizar plantilla
+      description: Actualiza una plantilla existente (crea nueva versión si está published)
+      operationId: updateTemplate
+      parameters:
+        - $ref: '../parameters/templates.yaml#/TemplateIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/templates.yaml#/UpdateTemplateRequest'
+      responses:
+        '200':
+          description: Plantilla actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/templates.yaml#/Template'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '403':
+          $ref: '../responses/common.yaml#/Forbidden'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+
+    delete:
+      tags: [Templates]
+      summary: Eliminar plantilla
+      description: Elimina una plantilla (solo si está en draft o deprecated)
+      operationId: deleteTemplate
+      parameters:
+        - $ref: '../parameters/templates.yaml#/TemplateIdParam'
+      responses:
+        '204':
+          description: Plantilla eliminada exitosamente
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '403':
+          $ref: '../responses/common.yaml#/Forbidden'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+
+  /templates/{templateId}/publish:
+    post:
+      tags: [Templates]
+      summary: Publicar plantilla
+      description: Cambia el estado de una plantilla de draft a published
+      operationId: publishTemplate
+      parameters:
+        - $ref: '../parameters/templates.yaml#/TemplateIdParam'
+      responses:
+        '200':
+          description: Plantilla publicada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/templates.yaml#/Template'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '403':
+          $ref: '../responses/common.yaml#/Forbidden'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'

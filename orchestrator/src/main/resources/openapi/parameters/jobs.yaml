@@ -1,0 +1,9 @@
+JobIdParam:
+  name: jobId
+  in: path
+  required: true
+  description: ID único del job
+  schema:
+    type: string
+    format: uuid
+    example: "456e7890-e89b-12d3-a456-426614174000"

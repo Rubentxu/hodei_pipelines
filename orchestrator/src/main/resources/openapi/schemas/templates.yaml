@@ -1,0 +1,300 @@
+# Template Types
+TemplateStatus:
+  type: string
+  enum: [draft, published, deprecated, archived]
+  description: |
+    Estado del ciclo de vida de la plantilla:
+    - draft: En desarrollo, editable
+    - published: Publicada, disponible para crear jobs
+    - deprecated: Marcada como obsoleta, no recomendada
+    - archived: Archivada, no disponible para nuevos jobs
+
+Template:
+  type: object
+  required: [id, name, version, status, content, createdAt, updatedAt, createdBy]
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: ID único de la plantilla
+      example: "123e4567-e89b-12d3-a456-426614174000"
+    name:
+      type: string
+      pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+      maxLength: 63
+      description: Nombre único de la plantilla (DNS-1123 compliant)
+      example: "build-and-test-pipeline"
+    displayName:
+      type: string
+      maxLength: 255
+      description: Nombre descriptivo para mostrar
+      example: "Build and Test Pipeline"
+    description:
+      type: string
+      maxLength: 1000
+      description: Descripción de la plantilla
+      example: "Pipeline para compilar y ejecutar tests de aplicaciones"
+    version:
+      type: string
+      pattern: '^v\d+\.\d+\.\d+$'
+      description: Versión semántica de la plantilla
+      example: "v1.2.3"
+    status:
+      $ref: '#/TemplateStatus'
+    content:
+      $ref: '#/TemplateContent'
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+      description: Etiquetas clave-valor para organización
+      example:
+        team: "backend"
+        type: "ci-cd"
+    annotations:
+      type: object
+      additionalProperties:
+        type: string
+      description: Metadatos adicionales
+    createdAt:
+      type: string
+      format: date-time
+      description: Timestamp de creación
+    updatedAt:
+      type: string
+      format: date-time
+      description: Timestamp de última actualización
+    createdBy:
+      type: string
+      description: Usuario o servicio que creó la plantilla
+      example: "elena@empresa.com"
+
+TemplateContent:
+  type: object
+  required: [type]
+  properties:
+    type:
+      type: string
+      enum: [kotlin_script, shell_commands]
+      description: Tipo de contenido de la plantilla
+    kotlinScript:
+      type: string
+      description: Script de Kotlin DSL (si type = kotlin_script)
+      example: |
+        pipeline {
+          stage("Build") {
+            sh("./gradlew build")
+          }
+          stage("Test") {
+            sh("./gradlew test")
+          }
+        }
+    shellCommands:
+      type: array
+      items:
+        type: string
+      description: Lista de comandos shell (si type = shell_commands)
+      example: ["echo 'Starting build'", "./build.sh", "echo 'Build completed'"]
+    parameters:
+      type: array
+      items:
+        $ref: '#/TemplateParameter'
+      description: Parámetros configurables de la plantilla
+    resources:
+      $ref: '../schemas/common.yaml#/ResourceRequirements'
+    timeout:
+      type: string
+      pattern: '^\d+[smh]$'
+      description: Timeout máximo de ejecución
+      example: "30m"
+
+TemplateParameter:
+  type: object
+  required: [name, type]
+  properties:
+    name:
+      type: string
+      pattern: '^[a-zA-Z][a-zA-Z0-9_]*$'
+      description: Nombre del parámetro
+      example: "build_version"
+    displayName:
+      type: string
+      description: Nombre para mostrar
+      example: "Build Version"
+    description:
+      type: string
+      description: Descripción del parámetro
+      example: "Version number for the build"
+    type:
+      type: string
+      enum: [string, integer, number, boolean, array, object]
+      description: Tipo de dato del parámetro
+    required:
+      type: boolean
+      default: false
+      description: Indica si el parámetro es obligatorio
+    defaultValue:
+      description: Valor por defecto
+      oneOf:
+        - type: string
+        - type: integer
+        - type: number
+        - type: boolean
+        - type: array
+        - type: object
+    validation:
+      $ref: '#/ParameterValidation'
+
+ParameterValidation:
+  type: object
+  properties:
+    pattern:
+      type: string
+      description: Expresión regular para validación (solo strings)
+      example: "^v\\d+\\.\\d+\\.\\d+$"
+    minLength:
+      type: integer
+      minimum: 0
+      description: Longitud mínima (solo strings)
+    maxLength:
+      type: integer
+      minimum: 0
+      description: Longitud máxima (solo strings)
+    minimum:
+      type: number
+      description: Valor mínimo (solo números)
+    maximum:
+      type: number
+      description: Valor máximo (solo números)
+    enum:
+      type: array
+      items:
+        oneOf:
+          - type: string
+          - type: integer
+          - type: number
+      description: Lista de valores permitidos
+
+CreateTemplateRequest:
+  type: object
+  required: [name, content]
+  properties:
+    name:
+      type: string
+      pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+      maxLength: 63
+      description: Nombre único de la plantilla
+      example: "new-pipeline-template"
+    displayName:
+      type: string
+      maxLength: 255
+      description: Nombre descriptivo
+      example: "New Pipeline Template"
+    description:
+      type: string
+      maxLength: 1000
+      description: Descripción de la plantilla
+    content:
+      $ref: '#/TemplateContent'
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+      description: Etiquetas para organización
+
+UpdateTemplateRequest:
+  type: object
+  properties:
+    displayName:
+      type: string
+      maxLength: 255
+      description: Nombre descriptivo
+    description:
+      type: string
+      maxLength: 1000
+      description: Descripción de la plantilla
+    content:
+      $ref: '#/TemplateContent'
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+      description: Etiquetas para organización
+
+ValidateTemplateRequest:
+  type: object
+  required: [content]
+  properties:
+    content:
+      $ref: '#/TemplateContent'
+
+ValidationResult:
+  type: object
+  required: [valid]
+  properties:
+    valid:
+      type: boolean
+      description: Indica si la plantilla es válida
+    errors:
+      type: array
+      items:
+        $ref: '#/ValidationError'
+      description: Lista de errores de validación
+    warnings:
+      type: array
+      items:
+        $ref: '#/ValidationWarning'
+      description: Lista de advertencias
+
+ValidationError:
+  type: object
+  required: [code, message]
+  properties:
+    code:
+      type: string
+      description: Código de error
+      example: "SYNTAX_ERROR"
+    message:
+      type: string
+      description: Mensaje del error
+      example: "Syntax error at line 5: Missing closing brace"
+    line:
+      type: integer
+      description: Línea donde ocurre el error
+    column:
+      type: integer
+      description: Columna donde ocurre el error
+    field:
+      type: string
+      description: Campo relacionado con el error
+
+ValidationWarning:
+  type: object
+  required: [code, message]
+  properties:
+    code:
+      type: string
+      description: Código de advertencia
+      example: "DEPRECATED_FUNCTION"
+    message:
+      type: string
+      description: Mensaje de advertencia
+      example: "Function 'oldStep' is deprecated, use 'newStep' instead"
+    line:
+      type: integer
+      description: Línea donde ocurre la advertencia
+    column:
+      type: integer
+      description: Columna donde ocurre la advertencia
+
+TemplateListResponse:
+  type: object
+  required: [data, meta]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/Template'
+      description: Lista de plantillas
+    meta:
+      $ref: '../schemas/common.yaml#/PaginationMeta'

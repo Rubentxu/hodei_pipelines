@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package dev.rubentxu.hodei.pipelines.v1;
+
+option java_package = "dev.rubentxu.hodei.pipelines.v1";
+option java_multiple_files = true;
+
+import "google/protobuf/struct.proto"; // Para permitir parámetros complejos y estructurados.
+
+service WorkerService {
+  rpc Connect(stream WorkerMessage) returns (stream OrchestratorMessage);
+}
+
+// Mensajes que el Worker (cliente) envía al Orquestador (servidor)
+message WorkerMessage {
+  oneof payload {
+    RegisterRequest register_request = 1;
+    StatusUpdate status_update = 2;
+    LogChunk log_chunk = 3;
+    ExecutionResult execution_result = 4;
+  }
+}
+
+// Mensajes que el Orquestador (servidor) envía al Worker (cliente)
+message OrchestratorMessage {
+  oneof payload {
+    ExecutionAssignment execution_assignment = 1;
+    CancelSignal cancel_signal = 2;
+    Artifact artifact = 3;
+  }
+}
+
+// --- Definiciones de Mensajes ---
+
+message RegisterRequest {
+  string worker_id = 1;
+}
+
+message ExecutionAssignment {
+  string execution_id = 1;
+  ExecutionDefinition definition = 2;
+  repeated ArtifactMetadata required_artifacts = 3;
+}
+
+// Define la tarea a ejecutar por el worker.
+// Es un contenedor para una tarea de shell o una tarea de script Kotlin.
+message ExecutionDefinition {
+  map<string, string> env_vars = 1;
+
+  // La lógica de ejecución a realizar. Solo uno puede ser establecido.
+  oneof task {
+    ShellTask shell = 2;
+    KotlinScriptTask kotlin_script = 3;
+  }
+}
+
+// Define una tarea simple de ejecución de comandos de shell.
+message ShellTask {
+  repeated string commands = 1;
+}
+
+// Define una tarea de script Kotlin.
+// Contiene el código y los parámetros de entrada, nada más.
+message KotlinScriptTask {
+  string script_content = 1;
+  google.protobuf.Struct parameters = 2;
+}
+
+
+message StatusUpdate {
+  EventType event_type = 1;
+  string message = 2;
+  int64 timestamp = 3;
+}
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  STAGE_STARTED = 1;
+  STEP_STARTED = 2;
+  STEP_COMPLETED = 3;
+  STAGE_COMPLETED = 4;
+}
+
+message LogChunk {
+  LogStream stream = 1;
+  bytes content = 2;
+}
+
+enum LogStream {
+  LOG_STREAM_UNSPECIFIED = 0;
+  STDOUT = 1;
+  STDERR = 2;
+}
+
+message ExecutionResult {
+  bool success = 1;
+  int32 exit_code = 2;
+  string details = 3;
+}
+
+message CancelSignal {
+  string reason = 1;
+}
+
+message ArtifactMetadata {
+  string artifact_id = 1;
+  string destination_path = 2;
+}
+
+message Artifact {
+  string artifact_id = 1;
+  bytes content = 2;
+}

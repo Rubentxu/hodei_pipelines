@@ -1,0 +1,67 @@
+BadRequest:
+  description: Petición inválida
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/ErrorResponse'
+      example:
+        error: "VALIDATION_FAILED"
+        message: "El campo 'name' es requerido"
+        timestamp: "2024-01-15T10:30:00Z"
+        traceId: "abc123-def456"
+
+Unauthorized:
+  description: No autenticado
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/ErrorResponse'
+      example:
+        error: "UNAUTHORIZED"
+        message: "Token de autenticación requerido"
+        timestamp: "2024-01-15T10:30:00Z"
+
+Forbidden:
+  description: No autorizado
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/ErrorResponse'
+      example:
+        error: "FORBIDDEN"
+        message: "Permisos insuficientes para esta operación"
+        timestamp: "2024-01-15T10:30:00Z"
+
+NotFound:
+  description: Recurso no encontrado
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/ErrorResponse'
+      example:
+        error: "NOT_FOUND"
+        message: "El recurso especificado no existe"
+        timestamp: "2024-01-15T10:30:00Z"
+
+Conflict:
+  description: Conflicto con el estado actual del recurso
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/ErrorResponse'
+      example:
+        error: "CONFLICT"
+        message: "Ya existe un recurso con ese nombre"
+        timestamp: "2024-01-15T10:30:00Z"
+
+InternalServerError:
+  description: Error interno del servidor
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/ErrorResponse'
+      example:
+        error: "INTERNAL_ERROR"
+        message: "Error interno del servidor"
+        timestamp: "2024-01-15T10:30:00Z"
+        traceId: "abc123-def456"

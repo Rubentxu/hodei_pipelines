@@ -1,0 +1,40 @@
+paths:
+  /health:
+    get:
+      tags: [Admin]
+      summary: Health check del sistema
+      description: Verifica el estado de salud del orquestador y sus dependencias
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Sistema saludable
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common.yaml#/HealthStatus'
+        '503':
+          description: Sistema degradado o no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common.yaml#/HealthStatus'
+
+  /metrics:
+    get:
+      tags: [Admin]
+      summary: Métricas del sistema en formato Prometheus
+      description: Exporta métricas del sistema para monitorización
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Métricas en formato Prometheus
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP hodei_jobs_total Total number of jobs
+                  # TYPE hodei_jobs_total counter
+                  hodei_jobs_total{status="completed"} 1234
+                  hodei_jobs_total{status="failed"} 56

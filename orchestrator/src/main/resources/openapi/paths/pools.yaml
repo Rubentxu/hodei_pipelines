@@ -1,0 +1,468 @@
+paths:
+  /pools:
+    get:
+      tags: [Pools]
+      summary: List pools
+      description: |
+        Retrieve a paginated list of resource pools with optional filtering by status and type.
+      operationId: listPools
+      parameters:
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+        - $ref: '../parameters/common.yaml#/SortParam'
+        - name: status
+          in: query
+          description: Filter pools by status
+          schema:
+            $ref: '../schemas/pools.yaml#/PoolStatus'
+        - name: type
+          in: query
+          description: Filter pools by type
+          schema:
+            $ref: '../schemas/pools.yaml#/PoolType'
+      responses:
+        '200':
+          description: Pools retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/PoolListResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    post:
+      tags: [Pools]
+      summary: Create pool
+      description: |
+        Create a new resource pool with specified configuration and capacity.
+      operationId: createPool
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pools.yaml#/CreatePoolRequest'
+      responses:
+        '201':
+          description: Pool created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Pool'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /pools/{poolId}:
+    get:
+      tags: [Pools]
+      summary: Get pool details
+      description: |
+        Retrieve detailed information about a specific pool, including current capacity and workers.
+      operationId: getPool
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+      responses:
+        '200':
+          description: Pool details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Pool'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    put:
+      tags: [Pools]
+      summary: Update pool
+      description: |
+        Update pool configuration, capacity, or other settings.
+      operationId: updatePool
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pools.yaml#/UpdatePoolRequest'
+      responses:
+        '200':
+          description: Pool updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Pool'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    delete:
+      tags: [Pools]
+      summary: Delete pool
+      description: |
+        Delete a resource pool. All workers in the pool must be drained first.
+      operationId: deletePool
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+      responses:
+        '204':
+          description: Pool deleted successfully
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /pools/{poolId}/drain:
+    post:
+      tags: [Pools]
+      summary: Drain pool
+      description: |
+        Drain a pool by preventing new job assignments and waiting for current jobs to complete.
+      operationId: drainPool
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pools.yaml#/DrainPoolRequest'
+      responses:
+        '202':
+          description: Pool drain initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Pool'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /pools/{poolId}/resume:
+    post:
+      tags: [Pools]
+      summary: Resume pool
+      description: |
+        Resume a drained pool to allow new job assignments.
+      operationId: resumePool
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+      responses:
+        '200':
+          description: Pool resumed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Pool'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /pools/{poolId}/maintenance:
+    post:
+      tags: [Pools]
+      summary: Pool maintenance
+      description: |
+        Put pool into maintenance mode and perform maintenance operations.
+      operationId: poolMaintenance
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pools.yaml#/MaintenanceRequest'
+      responses:
+        '202':
+          description: Pool maintenance initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Pool'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /pools/{poolId}/quotas:
+    get:
+      tags: [Pools]
+      summary: List pool quotas
+      description: |
+        Retrieve quotas configured for a specific pool.
+      operationId: listPoolQuotas
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+      responses:
+        '200':
+          description: Pool quotas retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/QuotaListResponse'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    post:
+      tags: [Pools]
+      summary: Create pool quota
+      description: |
+        Create a new quota for the pool.
+      operationId: createPoolQuota
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pools.yaml#/CreateQuotaRequest'
+      responses:
+        '201':
+          description: Pool quota created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Quota'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /pools/{poolId}/quotas/{quotaId}:
+    get:
+      tags: [Pools]
+      summary: Get pool quota
+      description: |
+        Retrieve details about a specific pool quota.
+      operationId: getPoolQuota
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+        - $ref: '../parameters/pools.yaml#/QuotaIdParam'
+      responses:
+        '200':
+          description: Pool quota retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Quota'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    put:
+      tags: [Pools]
+      summary: Update pool quota
+      description: |
+        Update configuration of a pool quota.
+      operationId: updatePoolQuota
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+        - $ref: '../parameters/pools.yaml#/QuotaIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/pools.yaml#/UpdateQuotaRequest'
+      responses:
+        '200':
+          description: Pool quota updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Quota'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    delete:
+      tags: [Pools]
+      summary: Delete pool quota
+      description: |
+        Delete a pool quota.
+      operationId: deletePoolQuota
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+        - $ref: '../parameters/pools.yaml#/QuotaIdParam'
+      responses:
+        '204':
+          description: Pool quota deleted successfully
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /pools/{poolId}/metrics:
+    get:
+      tags: [Pools]
+      summary: Get pool metrics
+      description: |
+        Retrieve performance and utilization metrics for a pool.
+      operationId: getPoolMetrics
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+        - name: from
+          in: query
+          description: Get metrics from this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Get metrics until this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: granularity
+          in: query
+          description: Metrics granularity
+          schema:
+            type: string
+            enum: [minute, hour, day]
+            default: hour
+      responses:
+        '200':
+          description: Pool metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  poolId:
+                    type: string
+                  timeRange:
+                    type: object
+                    properties:
+                      from:
+                        type: string
+                        format: date-time
+                      to:
+                        type: string
+                        format: date-time
+                  metrics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                        utilization:
+                          type: number
+                          format: float
+                        throughput:
+                          type: number
+                          format: float
+                        queueDepth:
+                          type: integer
+                        activeWorkers:
+                          type: integer
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /pools/{poolId}/workers:
+    get:
+      tags: [Pools]
+      summary: List pool workers
+      description: |
+        Retrieve workers belonging to a specific pool.
+      operationId: listPoolWorkers
+      parameters:
+        - $ref: '../parameters/pools.yaml#/PoolIdParam'
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+        - name: status
+          in: query
+          description: Filter workers by status
+          schema:
+            $ref: '../schemas/pools.yaml#/WorkerStatus'
+      responses:
+        '200':
+          description: Pool workers retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/WorkerListResponse'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'

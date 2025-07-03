@@ -1,0 +1,8 @@
+WorkerIdParam:
+  name: workerId
+  in: path
+  required: true
+  description: Unique worker identifier
+  schema:
+    type: string
+    example: "worker-12345"

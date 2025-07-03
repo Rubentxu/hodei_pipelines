@@ -1,0 +1,236 @@
+paths:
+  /auth/login:
+    post:
+      tags: [Security]
+      summary: User login
+      description: |
+        Authenticate user and return access token and refresh token.
+      operationId: login
+      security: []  # No authentication required for login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/auth.yaml#/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/auth.yaml#/LoginResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common.yaml#/ErrorResponse'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /auth/refresh:
+    post:
+      tags: [Security]
+      summary: Refresh access token
+      description: |
+        Use refresh token to obtain a new access token.
+      operationId: refreshToken
+      security: []  # Uses refresh token in request body
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/auth.yaml#/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/auth.yaml#/RefreshTokenResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /auth/logout:
+    post:
+      tags: [Security]
+      summary: User logout
+      description: |
+        Invalidate current access token and refresh token.
+      operationId: logout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/auth.yaml#/LogoutRequest'
+      responses:
+        '204':
+          description: Logout successful
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /auth/me:
+    get:
+      tags: [Security]
+      summary: Get current user
+      description: |
+        Retrieve information about the currently authenticated user.
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: User information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/auth.yaml#/User'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /auth/permissions:
+    get:
+      tags: [Security]
+      summary: Get user permissions
+      description: |
+        Retrieve detailed permissions for the current user.
+      operationId: getUserPermissions
+      responses:
+        '200':
+          description: User permissions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/auth.yaml#/PermissionsResponse'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /auth/sessions:
+    get:
+      tags: [Security]
+      summary: List active sessions
+      description: |
+        Retrieve list of active sessions for the current user.
+      operationId: listUserSessions
+      parameters:
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+      responses:
+        '200':
+          description: Active sessions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/auth.yaml#/SessionListResponse'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /auth/sessions/{sessionId}:
+    delete:
+      tags: [Security]
+      summary: Revoke session
+      description: |
+        Revoke a specific session, invalidating its tokens.
+      operationId: revokeSession
+      parameters:
+        - $ref: '../parameters/auth.yaml#/SessionIdParam'
+      responses:
+        '204':
+          description: Session revoked successfully
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /auth/password/change:
+    post:
+      tags: [Security]
+      summary: Change password
+      description: |
+        Change the current user's password.
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/auth.yaml#/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Password changed successfully
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /auth/password/reset:
+    post:
+      tags: [Security]
+      summary: Request password reset
+      description: |
+        Request a password reset token to be sent to the user's email.
+      operationId: requestPasswordReset
+      security: []  # No authentication required
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/auth.yaml#/PasswordResetRequest'
+      responses:
+        '204':
+          description: Password reset email sent (if user exists)
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '429':
+          description: Too many reset requests
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common.yaml#/ErrorResponse'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /auth/password/reset/confirm:
+    post:
+      tags: [Security]
+      summary: Confirm password reset
+      description: |
+        Confirm password reset using the token received via email.
+      operationId: confirmPasswordReset
+      security: []  # Uses reset token in request body
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/auth.yaml#/PasswordResetConfirmRequest'
+      responses:
+        '204':
+          description: Password reset successfully
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'

@@ -1,0 +1,305 @@
+WorkerStatus:
+  type: string
+  enum:
+    - provisioning
+    - idle
+    - busy
+    - draining
+    - maintenance
+    - terminating
+    - terminated
+    - error
+  description: Current status of a worker
+
+Worker:
+  type: object
+  required:
+    - id
+    - poolId
+    - status
+    - createdAt
+  properties:
+    id:
+      type: string
+      description: Unique worker identifier
+    poolId:
+      type: string
+      description: Pool this worker belongs to
+    status:
+      $ref: '#/WorkerStatus'
+    capabilities:
+      $ref: '#/WorkerCapabilities'
+    resources:
+      $ref: '#/WorkerResources'
+    usage:
+      $ref: '#/WorkerUsage'
+    currentExecution:
+      type: string
+      description: Currently assigned execution ID
+    nodeId:
+      type: string
+      description: Physical node identifier
+    ipAddress:
+      type: string
+      description: Worker IP address
+    lastHeartbeat:
+      type: string
+      format: date-time
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+    terminatedAt:
+      type: string
+      format: date-time
+    statistics:
+      $ref: '#/WorkerStatistics'
+
+WorkerCapabilities:
+  type: object
+  properties:
+    cpu:
+      type: string
+      description: CPU specification
+    memory:
+      type: string
+      description: Memory specification
+    storage:
+      type: string
+      description: Storage specification
+    platforms:
+      type: array
+      items:
+        type: string
+      description: Supported platforms (linux, windows, macos)
+    providers:
+      type: array
+      items:
+        type: string
+      description: Supported providers
+    runtimes:
+      type: array
+      items:
+        type: string
+      description: Supported runtimes (docker, kotlin, shell)
+    maxConcurrentJobs:
+      type: integer
+      default: 1
+    features:
+      type: array
+      items:
+        type: string
+      description: Special features (gpu, ssd, network)
+    customCapabilities:
+      type: object
+      additionalProperties:
+        type: string
+
+WorkerResources:
+  type: object
+  properties:
+    cpuCores:
+      type: number
+      format: float
+    memoryGB:
+      type: number
+      format: float
+    diskGB:
+      type: number
+      format: float
+    networkSpeedMbps:
+      type: number
+      format: float
+
+WorkerUsage:
+  type: object
+  properties:
+    cpu:
+      type: number
+      format: float
+      description: Current CPU usage percentage (0-100)
+    memory:
+      type: number
+      format: float
+      description: Current memory usage percentage (0-100)
+    disk:
+      type: number
+      format: float
+      description: Current disk usage percentage (0-100)
+    network:
+      type: object
+      properties:
+        inbound:
+          type: number
+          format: float
+          description: Inbound network usage in Mbps
+        outbound:
+          type: number
+          format: float
+          description: Outbound network usage in Mbps
+    lastUpdated:
+      type: string
+      format: date-time
+
+WorkerStatistics:
+  type: object
+  properties:
+    totalExecutions:
+      type: integer
+    successfulExecutions:
+      type: integer
+    failedExecutions:
+      type: integer
+    averageExecutionTime:
+      type: number
+      format: float
+      description: Average execution time in seconds
+    totalUptime:
+      type: integer
+      description: Total uptime in seconds
+    lastExecution:
+      type: string
+      format: date-time
+
+TerminateWorkerRequest:
+  type: object
+  properties:
+    reason:
+      type: string
+      maxLength: 500
+    timeout:
+      type: integer
+      description: Timeout in seconds for graceful termination
+      default: 60
+    force:
+      type: boolean
+      description: Force termination without waiting for current jobs
+      default: false
+
+DrainWorkerRequest:
+  type: object
+  properties:
+    timeout:
+      type: integer
+      description: Timeout in seconds for draining
+      default: 300
+    reason:
+      type: string
+      maxLength: 500
+
+MaintenanceRequest:
+  type: object
+  properties:
+    reason:
+      type: string
+      maxLength: 500
+    estimatedDuration:
+      type: integer
+      description: Estimated maintenance duration in minutes
+    allowNewJobs:
+      type: boolean
+      description: Allow new jobs during maintenance
+      default: false
+
+LogEntry:
+  type: object
+  required:
+    - timestamp
+    - level
+    - message
+  properties:
+    timestamp:
+      type: string
+      format: date-time
+    level:
+      type: string
+      enum: [TRACE, DEBUG, INFO, WARN, ERROR]
+    message:
+      type: string
+    source:
+      type: string
+      description: Log source component
+    thread:
+      type: string
+      description: Thread name
+    exception:
+      type: string
+      description: Exception stack trace if any
+
+LogResponse:
+  type: object
+  required:
+    - entries
+    - pagination
+  properties:
+    entries:
+      type: array
+      items:
+        $ref: '#/LogEntry'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'
+
+WorkerMetrics:
+  type: object
+  required:
+    - workerId
+    - timeRange
+    - metrics
+  properties:
+    workerId:
+      type: string
+    timeRange:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+    metrics:
+      type: array
+      items:
+        type: object
+        properties:
+          timestamp:
+            type: string
+            format: date-time
+          cpu:
+            type: number
+            format: float
+            description: CPU usage percentage
+          memory:
+            type: number
+            format: float
+            description: Memory usage percentage
+          disk:
+            type: number
+            format: float
+            description: Disk usage percentage
+          networkIn:
+            type: number
+            format: float
+            description: Network inbound in Mbps
+          networkOut:
+            type: number
+            format: float
+            description: Network outbound in Mbps
+          activeJobs:
+            type: integer
+            description: Number of active jobs
+
+WorkerListResponse:
+  type: object
+  required:
+    - items
+    - pagination
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/Worker'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'

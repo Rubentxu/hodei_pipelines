@@ -1,0 +1,53 @@
+SessionIdParam:
+  name: sessionId
+  in: path
+  required: true
+  description: Unique session identifier
+  schema:
+    type: string
+    example: "session-12345"
+
+UserIdParam:
+  name: userId
+  in: path
+  required: true
+  description: Unique user identifier
+  schema:
+    type: string
+    example: "user-12345"
+
+GroupIdParam:
+  name: groupId
+  in: path
+  required: true
+  description: Unique group identifier
+  schema:
+    type: string
+    example: "group-12345"
+
+RoleIdParam:
+  name: roleId
+  in: path
+  required: true
+  description: Unique role identifier
+  schema:
+    type: string
+    example: "role-12345"
+
+ServiceAccountIdParam:
+  name: serviceAccountId
+  in: path
+  required: true
+  description: Unique service account identifier
+  schema:
+    type: string
+    example: "sa-12345"
+
+TokenIdParam:
+  name: tokenId
+  in: path
+  required: true
+  description: Unique token identifier
+  schema:
+    type: string
+    example: "token-12345"

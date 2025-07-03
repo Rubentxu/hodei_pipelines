@@ -1,0 +1,614 @@
+PoolStatus:
+  type: string
+  enum:
+    - provisioning
+    - active
+    - draining
+    - maintenance
+    - error
+  description: Current status of a resource pool
+
+PoolType:
+  type: string
+  enum:
+    - kubernetes
+    - docker
+    - vm
+    - bare_metal
+  description: Type of resource pool
+
+Pool:
+  type: object
+  required:
+    - id
+    - name
+    - type
+    - status
+    - createdAt
+  properties:
+    id:
+      type: string
+      description: Unique pool identifier
+    name:
+      type: string
+      description: Human-readable pool name
+    description:
+      type: string
+      description: Pool description
+    type:
+      $ref: '#/PoolType'
+    status:
+      $ref: '#/PoolStatus'
+    configuration:
+      $ref: '#/PoolConfiguration'
+    capacity:
+      $ref: '#/PoolCapacity'
+    resources:
+      $ref: '#/PoolResources'
+    statistics:
+      $ref: '#/PoolStatistics'
+    workers:
+      type: array
+      items:
+        $ref: '#/Worker'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+    createdBy:
+      type: string
+
+PoolConfiguration:
+  type: object
+  properties:
+    autoScaling:
+      $ref: '#/AutoScalingConfig'
+    networking:
+      $ref: '#/NetworkingConfig'
+    security:
+      $ref: '#/SecurityConfig'
+    monitoring:
+      $ref: '#/MonitoringConfig'
+    alerting:
+      $ref: '#/AlertingConfig'
+    provisioner:
+      $ref: '#/ProvisionerConfig'
+
+AutoScalingConfig:
+  type: object
+  properties:
+    enabled:
+      type: boolean
+      default: true
+    minWorkers:
+      type: integer
+      minimum: 0
+      default: 0
+    maxWorkers:
+      type: integer
+      minimum: 1
+      default: 10
+    targetUtilization:
+      type: number
+      format: float
+      minimum: 0.1
+      maximum: 1.0
+      default: 0.8
+    scaleUpThreshold:
+      type: number
+      format: float
+      default: 0.8
+    scaleDownThreshold:
+      type: number
+      format: float
+      default: 0.3
+    cooldownPeriod:
+      type: integer
+      description: Cooldown period in seconds
+      default: 300
+
+NetworkingConfig:
+  type: object
+  properties:
+    subnet:
+      type: string
+    securityGroups:
+      type: array
+      items:
+        type: string
+    loadBalancer:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        type:
+          type: string
+          enum: [internal, external]
+
+SecurityConfig:
+  type: object
+  properties:
+    isolationLevel:
+      type: string
+      enum: [none, process, container, vm]
+      default: container
+    allowedImages:
+      type: array
+      items:
+        type: string
+    resourceLimits:
+      $ref: 'common.yaml#/ResourceRequirements'
+    securityContext:
+      type: object
+      properties:
+        runAsUser:
+          type: integer
+        runAsGroup:
+          type: integer
+        fsGroup:
+          type: integer
+        privileged:
+          type: boolean
+          default: false
+
+MonitoringConfig:
+  type: object
+  properties:
+    enabled:
+      type: boolean
+      default: true
+    metricsInterval:
+      type: integer
+      description: Metrics collection interval in seconds
+      default: 30
+    logLevel:
+      type: string
+      enum: [TRACE, DEBUG, INFO, WARN, ERROR]
+      default: INFO
+
+AlertingConfig:
+  type: object
+  properties:
+    enabled:
+      type: boolean
+      default: true
+    webhookUrl:
+      type: string
+      format: uri
+    thresholds:
+      type: object
+      properties:
+        cpuUtilization:
+          type: number
+          format: float
+          default: 0.9
+        memoryUtilization:
+          type: number
+          format: float
+          default: 0.9
+        diskUtilization:
+          type: number
+          format: float
+          default: 0.8
+
+ProvisionerConfig:
+  type: object
+  properties:
+    provider:
+      type: string
+      enum: [kubernetes, docker, aws, gcp, azure, local]
+    region:
+      type: string
+    availabilityZone:
+      type: string
+    instanceType:
+      type: string
+    image:
+      type: string
+    userData:
+      type: string
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+
+PoolCapacity:
+  type: object
+  required:
+    - total
+    - available
+    - used
+  properties:
+    total:
+      $ref: '#/ResourceCapacity'
+    available:
+      $ref: '#/ResourceCapacity'
+    used:
+      $ref: '#/ResourceCapacity'
+    reserved:
+      $ref: '#/ResourceCapacity'
+
+PoolResources:
+  type: object
+  properties:
+    cpu:
+      $ref: 'common.yaml#/ResourceUsage'
+    memory:
+      $ref: 'common.yaml#/ResourceUsage'
+    storage:
+      $ref: 'common.yaml#/ResourceUsage'
+    network:
+      $ref: 'common.yaml#/NetworkUsage'
+
+ResourceCapacity:
+  type: object
+  properties:
+    cpu:
+      type: number
+      format: float
+      description: CPU cores
+    memory:
+      type: number
+      format: float
+      description: Memory in GB
+    storage:
+      type: number
+      format: float
+      description: Storage in GB
+    workers:
+      type: integer
+      description: Number of workers
+
+PoolStatistics:
+  type: object
+  properties:
+    activeWorkers:
+      type: integer
+    idleWorkers:
+      type: integer
+    busyWorkers:
+      type: integer
+    totalJobs:
+      type: integer
+    successfulJobs:
+      type: integer
+    failedJobs:
+      type: integer
+    averageJobDuration:
+      type: number
+      format: float
+      description: Average job duration in seconds
+    throughput:
+      type: number
+      format: float
+      description: Jobs per hour
+    uptime:
+      type: number
+      format: float
+      description: Pool uptime percentage
+
+WorkerStatus:
+  type: string
+  enum:
+    - provisioning
+    - idle
+    - busy
+    - draining
+    - maintenance
+    - terminating
+    - terminated
+    - error
+  description: Current status of a worker
+
+Worker:
+  type: object
+  required:
+    - id
+    - poolId
+    - status
+    - createdAt
+  properties:
+    id:
+      type: string
+      description: Unique worker identifier
+    poolId:
+      type: string
+      description: Pool this worker belongs to
+    status:
+      $ref: '#/WorkerStatus'
+    capabilities:
+      $ref: '#/WorkerCapabilities'
+    resources:
+      $ref: '#/WorkerResources'
+    currentExecution:
+      type: string
+      description: Currently assigned execution ID
+    lastHeartbeat:
+      type: string
+      format: date-time
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+    terminatedAt:
+      type: string
+      format: date-time
+
+WorkerCapabilities:
+  type: object
+  properties:
+    cpu:
+      type: string
+      description: CPU specification
+    memory:
+      type: string
+      description: Memory specification
+    storage:
+      type: string
+      description: Storage specification
+    platforms:
+      type: array
+      items:
+        type: string
+      description: Supported platforms (linux, windows, macos)
+    providers:
+      type: array
+      items:
+        type: string
+      description: Supported providers
+    runtimes:
+      type: array
+      items:
+        type: string
+      description: Supported runtimes (docker, kotlin, shell)
+    maxConcurrentJobs:
+      type: integer
+      default: 1
+    features:
+      type: array
+      items:
+        type: string
+      description: Special features (gpu, ssd, network)
+    customCapabilities:
+      type: object
+      additionalProperties:
+        type: string
+
+WorkerResources:
+  type: object
+  properties:
+    cpuCores:
+      type: number
+      format: float
+    memoryGB:
+      type: number
+      format: float
+    diskGB:
+      type: number
+      format: float
+    networkSpeedMbps:
+      type: number
+      format: float
+
+QuotaPolicy:
+  type: string
+  enum:
+    - enforce
+    - warn
+    - monitor
+  description: How quota violations are handled
+
+Quota:
+  type: object
+  required:
+    - id
+    - name
+    - limits
+    - policy
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+    description:
+      type: string
+    namespace:
+      type: string
+      description: Namespace or project this quota applies to
+    limits:
+      $ref: '#/QuotaLimits'
+    policy:
+      $ref: '#/QuotaPolicy'
+    usage:
+      $ref: '#/QuotaUsage'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+QuotaLimits:
+  type: object
+  properties:
+    maxConcurrentJobs:
+      type: integer
+    maxCpuCores:
+      type: number
+      format: float
+    maxMemoryGB:
+      type: number
+      format: float
+    maxStorageGB:
+      type: number
+      format: float
+    maxJobDurationMinutes:
+      type: integer
+    maxJobsPerHour:
+      type: integer
+    maxJobsPerDay:
+      type: integer
+
+QuotaUsage:
+  type: object
+  properties:
+    currentJobs:
+      type: integer
+    usedCpuCores:
+      type: number
+      format: float
+    usedMemoryGB:
+      type: number
+      format: float
+    usedStorageGB:
+      type: number
+      format: float
+    jobsLastHour:
+      type: integer
+    jobsLastDay:
+      type: integer
+    lastUpdated:
+      type: string
+      format: date-time
+
+CreatePoolRequest:
+  type: object
+  required:
+    - name
+    - type
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    description:
+      type: string
+      maxLength: 1000
+    type:
+      $ref: '#/PoolType'
+    configuration:
+      $ref: '#/PoolConfiguration'
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+
+UpdatePoolRequest:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    description:
+      type: string
+      maxLength: 1000
+    configuration:
+      $ref: '#/PoolConfiguration'
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+
+DrainPoolRequest:
+  type: object
+  properties:
+    timeout:
+      type: integer
+      description: Timeout in seconds for draining
+      default: 300
+    force:
+      type: boolean
+      description: Force drain even with running jobs
+      default: false
+
+MaintenanceRequest:
+  type: object
+  properties:
+    reason:
+      type: string
+      maxLength: 500
+    estimatedDuration:
+      type: integer
+      description: Estimated maintenance duration in minutes
+    notifyUsers:
+      type: boolean
+      default: true
+
+CreateQuotaRequest:
+  type: object
+  required:
+    - name
+    - limits
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    description:
+      type: string
+      maxLength: 1000
+    namespace:
+      type: string
+    limits:
+      $ref: '#/QuotaLimits'
+    policy:
+      $ref: '#/QuotaPolicy'
+
+UpdateQuotaRequest:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    description:
+      type: string
+      maxLength: 1000
+    limits:
+      $ref: '#/QuotaLimits'
+    policy:
+      $ref: '#/QuotaPolicy'
+
+PoolListResponse:
+  type: object
+  required:
+    - items
+    - pagination
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/Pool'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'
+
+WorkerListResponse:
+  type: object
+  required:
+    - items
+    - pagination
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/Worker'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'
+
+QuotaListResponse:
+  type: object
+  required:
+    - items
+    - pagination
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/Quota'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'

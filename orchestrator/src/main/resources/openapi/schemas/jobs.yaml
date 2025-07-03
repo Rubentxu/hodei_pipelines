@@ -1,0 +1,200 @@
+JobStatus:
+  type: string
+  enum:
+    - pending
+    - queued
+    - running
+    - completed
+    - failed
+    - cancelled
+  description: Current status of a job
+
+Job:
+  type: object
+  required:
+    - id
+    - name
+    - status
+    - createdAt
+    - updatedAt
+  properties:
+    id:
+      type: string
+      description: Unique job identifier
+    name:
+      type: string
+      description: Human-readable job name
+    description:
+      type: string
+      description: Job description
+    status:
+      $ref: '#/JobStatus'
+    templateId:
+      type: string
+      description: Template used to create this job (if any)
+    priority:
+      type: string
+      enum: [LOW, NORMAL, HIGH, CRITICAL]
+      default: NORMAL
+    content:
+      $ref: '#/JobContent'
+    retryPolicy:
+      $ref: '#/RetryPolicy'
+    executions:
+      type: array
+      items:
+        $ref: '#/ExecutionReference'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+    completedAt:
+      type: string
+      format: date-time
+    createdBy:
+      type: string
+      description: User who created the job
+
+JobContent:
+  type: object
+  required:
+    - type
+  properties:
+    type:
+      type: string
+      enum: [shell, kotlin_script]
+    shellCommands:
+      type: array
+      items:
+        type: string
+      description: Shell commands to execute (for shell type)
+    kotlinScript:
+      type: string
+      description: Kotlin script content (for kotlin_script type)
+    parameters:
+      type: object
+      additionalProperties: true
+      description: Job parameters
+    environment:
+      type: object
+      additionalProperties:
+        type: string
+      description: Environment variables
+
+RetryPolicy:
+  type: object
+  properties:
+    maxRetries:
+      type: integer
+      minimum: 0
+      maximum: 10
+      default: 3
+    retryDelay:
+      type: integer
+      description: Delay between retries in seconds
+      default: 30
+    backoffMultiplier:
+      type: number
+      minimum: 1.0
+      default: 2.0
+
+ExecutionReference:
+  type: object
+  required:
+    - id
+    - status
+    - createdAt
+  properties:
+    id:
+      type: string
+    status:
+      type: string
+    createdAt:
+      type: string
+      format: date-time
+    completedAt:
+      type: string
+      format: date-time
+    workerId:
+      type: string
+
+CreateAdHocJobRequest:
+  type: object
+  required:
+    - name
+    - content
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    description:
+      type: string
+      maxLength: 1000
+    content:
+      $ref: '#/JobContent'
+    priority:
+      type: string
+      enum: [LOW, NORMAL, HIGH, CRITICAL]
+      default: NORMAL
+    retryPolicy:
+      $ref: '#/RetryPolicy'
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+
+CreateJobFromTemplateRequest:
+  type: object
+  required:
+    - templateId
+    - name
+  properties:
+    templateId:
+      type: string
+    name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    description:
+      type: string
+      maxLength: 1000
+    parameters:
+      type: object
+      additionalProperties: true
+    priority:
+      type: string
+      enum: [LOW, NORMAL, HIGH, CRITICAL]
+      default: NORMAL
+    retryPolicy:
+      $ref: '#/RetryPolicy'
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+
+CancelJobRequest:
+  type: object
+  properties:
+    reason:
+      type: string
+      maxLength: 500
+    force:
+      type: boolean
+      default: false
+      description: Force cancellation even if job is running
+
+JobListResponse:
+  type: object
+  required:
+    - items
+    - pagination
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/Job'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'

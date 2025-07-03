@@ -1,0 +1,151 @@
+# Common Types
+ErrorResponse:
+  type: object
+  required: [error, message, timestamp]
+  properties:
+    error:
+      type: string
+      description: Código de error
+      example: "VALIDATION_FAILED"
+    message:
+      type: string
+      description: Mensaje descriptivo del error
+      example: "El campo 'name' es requerido"
+    details:
+      type: object
+      additionalProperties: true
+      description: Detalles adicionales del error
+    timestamp:
+      type: string
+      format: date-time
+      description: Timestamp del error
+    traceId:
+      type: string
+      description: ID de trazabilidad para depuración
+      example: "abc123-def456-ghi789"
+
+PaginationMeta:
+  type: object
+  required: [page, size, totalElements, totalPages]
+  properties:
+    page:
+      type: integer
+      minimum: 0
+      description: Página actual (base 0)
+    size:
+      type: integer
+      minimum: 1
+      description: Tamaño de página
+    totalElements:
+      type: integer
+      minimum: 0
+      description: Total de elementos
+    totalPages:
+      type: integer
+      minimum: 0
+      description: Total de páginas
+    hasNext:
+      type: boolean
+      description: Indica si hay página siguiente
+    hasPrevious:
+      type: boolean
+      description: Indica si hay página anterior
+
+# Health and Status
+HealthStatus:
+  type: object
+  required: [status, timestamp]
+  properties:
+    status:
+      type: string
+      enum: [healthy, degraded, unhealthy]
+      description: Estado general del sistema
+    timestamp:
+      type: string
+      format: date-time
+      description: Timestamp de la verificación
+    components:
+      type: object
+      additionalProperties:
+        $ref: '#/ComponentHealth'
+      description: Estado de componentes individuales
+    version:
+      type: string
+      description: Versión del sistema
+      example: "1.0.0"
+
+ComponentHealth:
+  type: object
+  required: [status]
+  properties:
+    status:
+      type: string
+      enum: [healthy, degraded, unhealthy]
+    message:
+      type: string
+      description: Mensaje descriptivo del estado
+    details:
+      type: object
+      additionalProperties: true
+      description: Detalles adicionales específicos del componente
+
+# Resource Types
+ResourceRequirements:
+  type: object
+  properties:
+    cpu:
+      type: string
+      description: Requisitos de CPU
+      example: "500m"
+    memory:
+      type: string
+      description: Requisitos de memoria
+      example: "1Gi"
+    storage:
+      type: string
+      description: Requisitos de almacenamiento
+      example: "10Gi"
+
+ResourceUsage:
+  type: object
+  properties:
+    average:
+      type: string
+      description: Uso promedio
+      example: "250m"
+    peak:
+      type: string
+      description: Uso máximo
+      example: "500m"
+    unit:
+      type: string
+      description: Unidad de medida
+      example: "cores"
+
+NetworkUsage:
+  type: object
+  properties:
+    bytesRead:
+      type: integer
+      format: int64
+      description: Bytes leídos de la red
+    bytesWritten:
+      type: integer
+      format: int64
+      description: Bytes escritos a la red
+
+DiskUsage:
+  type: object
+  properties:
+    bytesRead:
+      type: integer
+      format: int64
+      description: Bytes leídos del disco
+    bytesWritten:
+      type: integer
+      format: int64
+      description: Bytes escritos al disco
+    spaceUsed:
+      type: string
+      description: Espacio en disco utilizado
+      example: "2.5GB"

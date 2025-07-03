@@ -1,0 +1,367 @@
+ExecutionStatus:
+  type: string
+  enum:
+    - pending
+    - running
+    - success
+    - failed
+    - cancelled
+  description: Current status of an execution
+
+Execution:
+  type: object
+  required:
+    - id
+    - jobId
+    - status
+    - createdAt
+  properties:
+    id:
+      type: string
+      description: Unique execution identifier
+    jobId:
+      type: string
+      description: Job this execution belongs to
+    status:
+      $ref: '#/ExecutionStatus'
+    workerId:
+      type: string
+      description: Worker assigned to this execution
+    poolId:
+      type: string
+      description: Pool where this execution is running
+    result:
+      $ref: '#/ExecutionResult'
+    error:
+      $ref: '#/ExecutionError'
+    metrics:
+      $ref: '#/ExecutionMetrics'
+    stages:
+      type: array
+      items:
+        $ref: '#/StageExecution'
+    createdAt:
+      type: string
+      format: date-time
+    startedAt:
+      type: string
+      format: date-time
+    completedAt:
+      type: string
+      format: date-time
+
+ExecutionResult:
+  type: object
+  required:
+    - success
+    - exitCode
+  properties:
+    success:
+      type: boolean
+    exitCode:
+      type: integer
+    message:
+      type: string
+    artifacts:
+      type: array
+      items:
+        $ref: '#/ArtifactReference'
+
+ExecutionError:
+  type: object
+  required:
+    - type
+    - message
+  properties:
+    type:
+      type: string
+      enum: [runtime_error, timeout, resource_exhausted, worker_disconnected, cancelled]
+    message:
+      type: string
+    details:
+      type: string
+    timestamp:
+      type: string
+      format: date-time
+
+ExecutionMetrics:
+  type: object
+  properties:
+    duration:
+      type: integer
+      description: Execution duration in seconds
+    cpuUsage:
+      type: number
+      format: float
+      description: Average CPU usage percentage
+    memoryUsage:
+      type: number
+      format: float
+      description: Peak memory usage in MB
+    networkIO:
+      type: object
+      properties:
+        bytesIn:
+          type: integer
+        bytesOut:
+          type: integer
+    diskIO:
+      type: object
+      properties:
+        bytesRead:
+          type: integer
+        bytesWritten:
+          type: integer
+
+StageExecution:
+  type: object
+  required:
+    - name
+    - status
+    - startedAt
+  properties:
+    name:
+      type: string
+    status:
+      $ref: '#/ExecutionStatus'
+    steps:
+      type: array
+      items:
+        $ref: '#/StepExecution'
+    startedAt:
+      type: string
+      format: date-time
+    completedAt:
+      type: string
+      format: date-time
+    duration:
+      type: integer
+      description: Stage duration in seconds
+
+StepExecution:
+  type: object
+  required:
+    - name
+    - status
+    - startedAt
+  properties:
+    name:
+      type: string
+    status:
+      $ref: '#/ExecutionStatus'
+    command:
+      type: string
+    exitCode:
+      type: integer
+    output:
+      type: string
+      description: Step output (truncated)
+    startedAt:
+      type: string
+      format: date-time
+    completedAt:
+      type: string
+      format: date-time
+    duration:
+      type: integer
+      description: Step duration in seconds
+
+ArtifactReference:
+  type: object
+  required:
+    - id
+    - name
+    - size
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+    path:
+      type: string
+    size:
+      type: integer
+      description: Size in bytes
+    contentType:
+      type: string
+    checksum:
+      type: string
+    createdAt:
+      type: string
+      format: date-time
+
+LogStream:
+  type: string
+  description: Server-Sent Events stream of log entries
+
+LogEntry:
+  type: object
+  required:
+    - timestamp
+    - level
+    - message
+  properties:
+    timestamp:
+      type: string
+      format: date-time
+    level:
+      type: string
+      enum: [TRACE, DEBUG, INFO, WARN, ERROR]
+    message:
+      type: string
+    source:
+      type: string
+      enum: [stdout, stderr]
+    stage:
+      type: string
+    step:
+      type: string
+
+LogResponse:
+  type: object
+  required:
+    - entries
+    - pagination
+  properties:
+    entries:
+      type: array
+      items:
+        $ref: '#/LogEntry'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'
+
+EventType:
+  type: string
+  enum:
+    - execution_started
+    - execution_completed
+    - execution_failed
+    - execution_cancelled
+    - stage_started
+    - stage_completed
+    - step_started
+    - step_completed
+    - worker_assigned
+    - worker_disconnected
+    - artifact_uploaded
+
+ExecutionEvent:
+  type: object
+  required:
+    - id
+    - type
+    - timestamp
+  properties:
+    id:
+      type: string
+    type:
+      $ref: '#/EventType'
+    timestamp:
+      type: string
+      format: date-time
+    message:
+      type: string
+    details:
+      type: object
+      additionalProperties: true
+    stage:
+      type: string
+    step:
+      type: string
+
+EventResponse:
+  type: object
+  required:
+    - events
+    - pagination
+  properties:
+    events:
+      type: array
+      items:
+        $ref: '#/ExecutionEvent'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'
+
+ExecutionReplay:
+  type: object
+  required:
+    - executionId
+    - timeline
+    - summary
+  properties:
+    executionId:
+      type: string
+    timeline:
+      type: array
+      items:
+        $ref: '#/TimelineEntry'
+    summary:
+      type: object
+      properties:
+        totalDuration:
+          type: integer
+        stagesCount:
+          type: integer
+        stepsCount:
+          type: integer
+        errorCount:
+          type: integer
+    metadata:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        includeSteps:
+          type: boolean
+        includeLogs:
+          type: boolean
+
+TimelineEntry:
+  type: object
+  required:
+    - timestamp
+    - type
+    - title
+  properties:
+    timestamp:
+      type: string
+      format: date-time
+    type:
+      $ref: '#/EventType'
+    title:
+      type: string
+    description:
+      type: string
+    duration:
+      type: integer
+    logs:
+      type: array
+      items:
+        $ref: '#/LogEntry'
+    metadata:
+      type: object
+      additionalProperties: true
+
+CancelExecutionRequest:
+  type: object
+  properties:
+    reason:
+      type: string
+      maxLength: 500
+    force:
+      type: boolean
+      default: false
+
+ExecutionListResponse:
+  type: object
+  required:
+    - items
+    - pagination
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/Execution'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'

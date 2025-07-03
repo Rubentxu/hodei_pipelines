@@ -1,0 +1,406 @@
+paths:
+  /executions:
+    get:
+      tags: [Executions]
+      summary: List executions
+      description: |
+        Retrieve a paginated list of executions with optional filtering by job, status, worker, and time range.
+      operationId: listExecutions
+      parameters:
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+        - $ref: '../parameters/common.yaml#/SortParam'
+        - name: jobId
+          in: query
+          description: Filter executions by job ID
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter executions by status
+          schema:
+            $ref: '../schemas/executions.yaml#/ExecutionStatus'
+        - name: workerId
+          in: query
+          description: Filter executions by worker ID
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Filter executions from this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Filter executions until this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Executions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/executions.yaml#/ExecutionListResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /executions/{executionId}:
+    get:
+      tags: [Executions]
+      summary: Get execution details
+      description: |
+        Retrieve detailed information about a specific execution, including its current status, metrics, and stages.
+      operationId: getExecution
+      parameters:
+        - $ref: '../parameters/executions.yaml#/ExecutionIdParam'
+      responses:
+        '200':
+          description: Execution details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/executions.yaml#/Execution'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    delete:
+      tags: [Executions]
+      summary: Cancel execution
+      description: |
+        Cancel a running execution. The execution will be gracefully stopped.
+      operationId: cancelExecution
+      parameters:
+        - $ref: '../parameters/executions.yaml#/ExecutionIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/executions.yaml#/CancelExecutionRequest'
+      responses:
+        '204':
+          description: Execution cancelled successfully
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /executions/{executionId}/logs:
+    get:
+      tags: [Executions]
+      summary: Get execution logs
+      description: |
+        Retrieve logs from an execution. Supports pagination and filtering by stage/step.
+      operationId: getExecutionLogs
+      parameters:
+        - $ref: '../parameters/executions.yaml#/ExecutionIdParam'
+        - name: stage
+          in: query
+          description: Filter logs by stage name
+          schema:
+            type: string
+        - name: step
+          in: query
+          description: Filter logs by step name
+          schema:
+            type: string
+        - name: level
+          in: query
+          description: Filter logs by level
+          schema:
+            type: string
+            enum: [TRACE, DEBUG, INFO, WARN, ERROR]
+        - name: from
+          in: query
+          description: Get logs from this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Get logs until this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+      responses:
+        '200':
+          description: Execution logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/executions.yaml#/LogResponse'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /executions/{executionId}/logs/stream:
+    get:
+      tags: [Executions]
+      summary: Stream execution logs
+      description: |
+        Stream real-time logs from a running execution using Server-Sent Events.
+      operationId: streamExecutionLogs
+      parameters:
+        - $ref: '../parameters/executions.yaml#/ExecutionIdParam'
+        - name: stage
+          in: query
+          description: Filter logs by stage name
+          schema:
+            type: string
+        - name: step
+          in: query
+          description: Filter logs by step name
+          schema:
+            type: string
+        - name: level
+          in: query
+          description: Filter logs by level
+          schema:
+            type: string
+            enum: [TRACE, DEBUG, INFO, WARN, ERROR]
+      responses:
+        '200':
+          description: Log stream started successfully
+          content:
+            text/event-stream:
+              schema:
+                $ref: '../schemas/executions.yaml#/LogStream'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /executions/{executionId}/events:
+    get:
+      tags: [Executions]
+      summary: Get execution events
+      description: |
+        Retrieve events from an execution timeline. Events include state changes, errors, and milestones.
+      operationId: getExecutionEvents
+      parameters:
+        - $ref: '../parameters/executions.yaml#/ExecutionIdParam'
+        - name: type
+          in: query
+          description: Filter events by type
+          schema:
+            $ref: '../schemas/executions.yaml#/EventType'
+        - name: from
+          in: query
+          description: Get events from this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Get events until this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+      responses:
+        '200':
+          description: Execution events retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/executions.yaml#/EventResponse'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /executions/{executionId}/events/stream:
+    get:
+      tags: [Executions]
+      summary: Stream execution events
+      description: |
+        Stream real-time events from a running execution using Server-Sent Events.
+      operationId: streamExecutionEvents
+      parameters:
+        - $ref: '../parameters/executions.yaml#/ExecutionIdParam'
+        - name: type
+          in: query
+          description: Filter events by type
+          schema:
+            $ref: '../schemas/executions.yaml#/EventType'
+      responses:
+        '200':
+          description: Event stream started successfully
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events stream of execution events
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /executions/{executionId}/replay:
+    get:
+      tags: [Executions]
+      summary: Get execution replay
+      description: |
+        Generate a detailed replay of the execution with timeline and decision points.
+      operationId: getExecutionReplay
+      parameters:
+        - $ref: '../parameters/executions.yaml#/ExecutionIdParam'
+        - name: includeSteps
+          in: query
+          description: Include step-level details in replay
+          schema:
+            type: boolean
+            default: true
+        - name: includeLogs
+          in: query
+          description: Include log samples in replay
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Execution replay generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/executions.yaml#/ExecutionReplay'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /executions/{executionId}/subscribe:
+    post:
+      tags: [Executions]
+      summary: Subscribe to execution events
+      description: |
+        Subscribe to receive real-time notifications about execution events.
+        Supports multiple delivery methods: Server-Sent Events (SSE), WebSocket, or Webhook.
+        
+        This endpoint is part of the new event-driven architecture where the ExecutionEngine
+        manages subscriptions and forwards events to interested clients.
+      operationId: subscribeToExecution
+      parameters:
+        - $ref: '../parameters/executions.yaml#/ExecutionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - deliveryMethod
+              properties:
+                eventTypes:
+                  type: array
+                  description: Types of events to subscribe to. If empty, subscribes to all events.
+                  items:
+                    $ref: '../schemas/executions.yaml#/EventType'
+                deliveryMethod:
+                  type: string
+                  enum: [SSE, WebSocket, Webhook]
+                  description: How to deliver the events
+                webhookUrl:
+                  type: string
+                  format: uri
+                  description: Required if deliveryMethod is Webhook
+                webhookSecret:
+                  type: string
+                  description: Optional secret for webhook signature verification
+      responses:
+        '200':
+          description: Subscription created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - subscriptionId
+                properties:
+                  subscriptionId:
+                    type: string
+                    description: Unique identifier for this subscription
+                  streamUrl:
+                    type: string
+                    format: uri
+                    description: URL to connect for SSE or WebSocket (if applicable)
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    description: When this subscription will expire
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          description: Conflict - subscription already exists
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/common.yaml#/ErrorResponse'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /ws/executions/{executionId}/stream:
+    get:
+      tags: [Executions]
+      summary: WebSocket endpoint for real-time execution streaming
+      description: |
+        Establish a WebSocket connection to receive real-time updates about an execution.
+        This includes status changes, logs, events, and completion notifications.
+        
+        The WebSocket protocol provides bidirectional communication for:
+        - Receiving execution status updates
+        - Streaming logs in real-time
+        - Getting stage/step progress notifications
+        - Receiving execution completion events
+        
+        Message format: JSON objects with type field indicating the message type.
+      operationId: streamExecutionWebSocket
+      parameters:
+        - $ref: '../parameters/executions.yaml#/ExecutionIdParam'
+        - name: token
+          in: query
+          description: Authentication token (since WebSocket doesn't support Authorization header)
+          required: true
+          schema:
+            type: string
+      responses:
+        '101':
+          description: Switching Protocols - WebSocket connection established
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'

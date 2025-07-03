@@ -1,0 +1,29 @@
+PageParam:
+  name: page
+  in: query
+  description: Número de página (base 0)
+  schema:
+    type: integer
+    minimum: 0
+    default: 0
+    example: 0
+
+SizeParam:
+  name: size
+  in: query
+  description: Número de elementos por página
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 20
+    example: 20
+
+SortParam:
+  name: sort
+  in: query
+  description: Campo de ordenación
+  schema:
+    type: string
+    default: "createdAt"
+    example: "name,asc"

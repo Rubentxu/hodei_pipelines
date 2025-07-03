@@ -1,0 +1,246 @@
+paths:
+  /workers:
+    get:
+      tags: [Workers]
+      summary: List workers
+      description: |
+        Retrieve a paginated list of workers with optional filtering by pool, status, and capabilities.
+      operationId: listWorkers
+      parameters:
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+        - $ref: '../parameters/common.yaml#/SortParam'
+        - name: poolId
+          in: query
+          description: Filter workers by pool ID
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter workers by status
+          schema:
+            $ref: '../schemas/pools.yaml#/WorkerStatus'
+        - name: capability
+          in: query
+          description: Filter workers by capability
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workers retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/WorkerListResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /workers/{workerId}:
+    get:
+      tags: [Workers]
+      summary: Get worker details
+      description: |
+        Retrieve detailed information about a specific worker, including current status and execution history.
+      operationId: getWorker
+      parameters:
+        - $ref: '../parameters/workers.yaml#/WorkerIdParam'
+      responses:
+        '200':
+          description: Worker details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Worker'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+    
+    delete:
+      tags: [Workers]
+      summary: Terminate worker
+      description: |
+        Gracefully terminate a worker. Current executions will be completed before termination.
+      operationId: terminateWorker
+      parameters:
+        - $ref: '../parameters/workers.yaml#/WorkerIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/workers.yaml#/TerminateWorkerRequest'
+      responses:
+        '204':
+          description: Worker terminated successfully
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /workers/{workerId}/drain:
+    post:
+      tags: [Workers]
+      summary: Drain worker
+      description: |
+        Drain a worker by preventing new job assignments and waiting for current jobs to complete.
+      operationId: drainWorker
+      parameters:
+        - $ref: '../parameters/workers.yaml#/WorkerIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/workers.yaml#/DrainWorkerRequest'
+      responses:
+        '202':
+          description: Worker drain initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Worker'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /workers/{workerId}/maintenance:
+    post:
+      tags: [Workers]
+      summary: Worker maintenance
+      description: |
+        Put worker into maintenance mode for updates or diagnostics.
+      operationId: workerMaintenance
+      parameters:
+        - $ref: '../parameters/workers.yaml#/WorkerIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/workers.yaml#/MaintenanceRequest'
+      responses:
+        '202':
+          description: Worker maintenance initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/pools.yaml#/Worker'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /workers/{workerId}/logs:
+    get:
+      tags: [Workers]
+      summary: Get worker logs
+      description: |
+        Retrieve logs from a worker for troubleshooting and monitoring.
+      operationId: getWorkerLogs
+      parameters:
+        - $ref: '../parameters/workers.yaml#/WorkerIdParam'
+        - name: level
+          in: query
+          description: Filter logs by level
+          schema:
+            type: string
+            enum: [TRACE, DEBUG, INFO, WARN, ERROR]
+        - name: from
+          in: query
+          description: Get logs from this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Get logs until this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+      responses:
+        '200':
+          description: Worker logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/workers.yaml#/LogResponse'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /workers/{workerId}/metrics:
+    get:
+      tags: [Workers]
+      summary: Get worker metrics
+      description: |
+        Retrieve performance and resource utilization metrics for a worker.
+      operationId: getWorkerMetrics
+      parameters:
+        - $ref: '../parameters/workers.yaml#/WorkerIdParam'
+        - name: from
+          in: query
+          description: Get metrics from this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Get metrics until this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: granularity
+          in: query
+          description: Metrics granularity
+          schema:
+            type: string
+            enum: [minute, hour, day]
+            default: hour
+      responses:
+        '200':
+          description: Worker metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  workerId:
+                    type: string
+                  metrics:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'

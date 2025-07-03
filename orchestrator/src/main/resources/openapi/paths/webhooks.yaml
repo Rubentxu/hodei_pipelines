@@ -1,0 +1,374 @@
+paths:
+  /webhooks:
+    get:
+      tags: [Webhooks]
+      summary: List webhooks
+      description: |
+        Retrieve a paginated list of webhooks with optional filtering by status, events, and other criteria.
+      operationId: listWebhooks
+      parameters:
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+        - $ref: '../parameters/common.yaml#/SortParam'
+        - name: status
+          in: query
+          description: Filter webhooks by status
+          schema:
+            $ref: '../schemas/webhooks.yaml#/WebhookStatus'
+        - name: eventType
+          in: query
+          description: Filter webhooks by event type
+          schema:
+            $ref: '../schemas/webhooks.yaml#/WebhookEventType'
+        - name: search
+          in: query
+          description: Search webhooks by name or description
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Webhooks retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/webhooks.yaml#/WebhookListResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+    post:
+      tags: [Webhooks]
+      summary: Create webhook
+      description: |
+        Create a new webhook to receive event notifications.
+      operationId: createWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/webhooks.yaml#/CreateWebhookRequest'
+      responses:
+        '201':
+          description: Webhook created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/webhooks.yaml#/Webhook'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /webhooks/{webhookId}:
+    get:
+      tags: [Webhooks]
+      summary: Get webhook details
+      description: |
+        Retrieve detailed information about a specific webhook including its configuration and statistics.
+      operationId: getWebhook
+      parameters:
+        - $ref: '../parameters/webhooks.yaml#/WebhookIdParam'
+      responses:
+        '200':
+          description: Webhook details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/webhooks.yaml#/Webhook'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+    put:
+      tags: [Webhooks]
+      summary: Update webhook
+      description: |
+        Update webhook configuration including URL, events, and filters.
+      operationId: updateWebhook
+      parameters:
+        - $ref: '../parameters/webhooks.yaml#/WebhookIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/webhooks.yaml#/UpdateWebhookRequest'
+      responses:
+        '200':
+          description: Webhook updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/webhooks.yaml#/Webhook'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+    delete:
+      tags: [Webhooks]
+      summary: Delete webhook
+      description: |
+        Delete a webhook. This action cannot be undone.
+      operationId: deleteWebhook
+      parameters:
+        - $ref: '../parameters/webhooks.yaml#/WebhookIdParam'
+      responses:
+        '204':
+          description: Webhook deleted successfully
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /webhooks/{webhookId}/test:
+    post:
+      tags: [Webhooks]
+      summary: Test webhook
+      description: |
+        Send a test event to the webhook to verify configuration and connectivity.
+      operationId: testWebhook
+      parameters:
+        - $ref: '../parameters/webhooks.yaml#/WebhookIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/webhooks.yaml#/TestWebhookRequest'
+      responses:
+        '200':
+          description: Webhook test completed
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/webhooks.yaml#/TestWebhookResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /webhooks/{webhookId}/deliveries:
+    get:
+      tags: [Webhooks]
+      summary: Get webhook deliveries
+      description: |
+        Retrieve delivery history for a webhook with detailed status and response information.
+      operationId: getWebhookDeliveries
+      parameters:
+        - $ref: '../parameters/webhooks.yaml#/WebhookIdParam'
+        - $ref: '../parameters/common.yaml#/PageParam'
+        - $ref: '../parameters/common.yaml#/SizeParam'
+        - $ref: '../parameters/common.yaml#/SortParam'
+        - name: status
+          in: query
+          description: Filter deliveries by status
+          schema:
+            type: string
+            enum: [pending, delivered, failed, retrying]
+        - name: eventType
+          in: query
+          description: Filter deliveries by event type
+          schema:
+            $ref: '../schemas/webhooks.yaml#/WebhookEventType'
+        - name: from
+          in: query
+          description: Get deliveries from this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Get deliveries until this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Webhook deliveries retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/webhooks.yaml#/WebhookDeliveryListResponse'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /webhooks/{webhookId}/deliveries/{deliveryId}:
+    get:
+      tags: [Webhooks]
+      summary: Get delivery details
+      description: |
+        Retrieve detailed information about a specific webhook delivery including request/response data.
+      operationId: getWebhookDelivery
+      parameters:
+        - $ref: '../parameters/webhooks.yaml#/WebhookIdParam'
+        - $ref: '../parameters/webhooks.yaml#/DeliveryIdParam'
+      responses:
+        '200':
+          description: Delivery details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/webhooks.yaml#/WebhookDelivery'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /webhooks/{webhookId}/deliveries/{deliveryId}/retry:
+    post:
+      tags: [Webhooks]
+      summary: Retry webhook delivery
+      description: |
+        Manually retry a failed webhook delivery.
+      operationId: retryWebhookDelivery
+      parameters:
+        - $ref: '../parameters/webhooks.yaml#/WebhookIdParam'
+        - $ref: '../parameters/webhooks.yaml#/DeliveryIdParam'
+      responses:
+        '202':
+          description: Delivery retry initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../schemas/webhooks.yaml#/WebhookDelivery'
+        '400':
+          $ref: '../responses/common.yaml#/BadRequest'
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '404':
+          $ref: '../responses/common.yaml#/NotFound'
+        '409':
+          $ref: '../responses/common.yaml#/Conflict'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  /webhook-events:
+    get:
+      tags: [Webhooks]
+      summary: Get webhook event types
+      description: |
+        Retrieve available webhook event types and their descriptions.
+      operationId: getWebhookEventTypes
+      responses:
+        '200':
+          description: Webhook event types retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          $ref: '../schemas/webhooks.yaml#/WebhookEventType'
+                        description:
+                          type: string
+                        category:
+                          type: string
+                          enum: [job, execution, template, pool, worker, system]
+                        payloadSchema:
+                          type: string
+                          description: JSON schema for the event payload
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'
+
+  # WebSocket Connection Info (OpenAPI 3.0.3 doesn't directly support WebSockets)
+  /websocket/info:
+    get:
+      tags: [Webhooks]
+      summary: Get WebSocket connection information
+      description: |
+        Get information about available WebSocket endpoints for real-time event streaming.
+        
+        WebSocket Endpoints (not directly documented in OpenAPI):
+        - ws://localhost:8080/v1/websocket/events - Real-time event stream
+        - ws://localhost:8080/v1/websocket/executions/{executionId}/logs - Live execution logs
+        - ws://localhost:8080/v1/websocket/pools/{poolId}/metrics - Real-time pool metrics
+        
+        Authentication: Include Bearer token in 'Authorization' header during WebSocket handshake.
+      operationId: getWebSocketInfo
+      responses:
+        '200':
+          description: WebSocket connection information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  endpoints:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        path:
+                          type: string
+                          description: WebSocket endpoint path
+                          example: "/websocket/events"
+                        protocol:
+                          type: string
+                          enum: [ws, wss]
+                        description:
+                          type: string
+                        supportedEvents:
+                          type: array
+                          items:
+                            $ref: '../schemas/webhooks.yaml#/WebhookEventType'
+                        messageFormat:
+                          type: string
+                          enum: [json]
+                        authentication:
+                          type: string
+                          enum: [bearer_token, session_cookie]
+                  connectionLimits:
+                    type: object
+                    properties:
+                      maxConnections:
+                        type: integer
+                      connectionTimeout:
+                        type: integer
+                        description: Connection timeout in seconds
+                      heartbeatInterval:
+                        type: integer
+                        description: Heartbeat interval in seconds
+        '401':
+          $ref: '../responses/common.yaml#/Unauthorized'
+        '500':
+          $ref: '../responses/common.yaml#/InternalServerError'

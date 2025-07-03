@@ -1,0 +1,398 @@
+LoginRequest:
+  type: object
+  required:
+    - username
+    - password
+  properties:
+    username:
+      type: string
+      minLength: 1
+      maxLength: 255
+    password:
+      type: string
+      minLength: 1
+      format: password
+    rememberMe:
+      type: boolean
+      default: false
+
+LoginResponse:
+  type: object
+  required:
+    - accessToken
+    - refreshToken
+    - expiresIn
+    - tokenType
+    - user
+  properties:
+    accessToken:
+      type: string
+      description: JWT access token
+    refreshToken:
+      type: string
+      description: Refresh token for obtaining new access tokens
+    expiresIn:
+      type: integer
+      description: Access token expiration time in seconds
+    tokenType:
+      type: string
+      enum: [Bearer]
+      default: Bearer
+    user:
+      $ref: '#/User'
+
+RefreshTokenRequest:
+  type: object
+  required:
+    - refreshToken
+  properties:
+    refreshToken:
+      type: string
+
+RefreshTokenResponse:
+  type: object
+  required:
+    - accessToken
+    - refreshToken
+    - expiresIn
+    - tokenType
+  properties:
+    accessToken:
+      type: string
+    refreshToken:
+      type: string
+    expiresIn:
+      type: integer
+    tokenType:
+      type: string
+      enum: [Bearer]
+      default: Bearer
+
+LogoutRequest:
+  type: object
+  properties:
+    refreshToken:
+      type: string
+      description: Optional refresh token to invalidate
+    allSessions:
+      type: boolean
+      description: Logout from all sessions
+      default: false
+
+User:
+  type: object
+  required:
+    - id
+    - username
+    - email
+    - roles
+    - permissions
+  properties:
+    id:
+      type: string
+      description: Unique user identifier
+    username:
+      type: string
+      description: Username for login
+    email:
+      type: string
+      format: email
+      description: User email address
+    firstName:
+      type: string
+      description: User first name
+    lastName:
+      type: string
+      description: User last name
+    displayName:
+      type: string
+      description: Display name
+    roles:
+      type: array
+      items:
+        type: string
+      description: User roles
+    permissions:
+      type: array
+      items:
+        type: string
+      description: Effective permissions
+    groups:
+      type: array
+      items:
+        type: string
+      description: Groups user belongs to
+    isActive:
+      type: boolean
+      description: Whether user account is active
+    lastLogin:
+      type: string
+      format: date-time
+      description: Last login timestamp
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+Permission:
+  type: object
+  required:
+    - id
+    - name
+    - resource
+    - action
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+      description: Human-readable permission name
+    resource:
+      type: string
+      description: Resource this permission applies to
+    action:
+      type: string
+      description: Action this permission allows
+    scope:
+      type: string
+      enum: [global, project, resource]
+      description: Permission scope
+    description:
+      type: string
+
+PermissionsResponse:
+  type: object
+  required:
+    - permissions
+  properties:
+    permissions:
+      type: array
+      items:
+        $ref: '#/Permission'
+    effectivePermissions:
+      type: array
+      items:
+        type: string
+      description: List of effective permission strings
+    scopes:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+      description: Permissions grouped by scope
+
+Session:
+  type: object
+  required:
+    - id
+    - userId
+    - createdAt
+    - expiresAt
+    - isActive
+  properties:
+    id:
+      type: string
+      description: Unique session identifier
+    userId:
+      type: string
+      description: User this session belongs to
+    deviceInfo:
+      type: object
+      properties:
+        userAgent:
+          type: string
+        ipAddress:
+          type: string
+        location:
+          type: string
+        deviceType:
+          type: string
+          enum: [desktop, mobile, tablet, api]
+    createdAt:
+      type: string
+      format: date-time
+    lastActivity:
+      type: string
+      format: date-time
+    expiresAt:
+      type: string
+      format: date-time
+    isActive:
+      type: boolean
+
+SessionListResponse:
+  type: object
+  required:
+    - items
+    - pagination
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/Session'
+    pagination:
+      $ref: 'common.yaml#/PaginationMeta'
+
+ChangePasswordRequest:
+  type: object
+  required:
+    - currentPassword
+    - newPassword
+  properties:
+    currentPassword:
+      type: string
+      format: password
+    newPassword:
+      type: string
+      format: password
+      minLength: 8
+    confirmPassword:
+      type: string
+      format: password
+
+PasswordResetRequest:
+  type: object
+  required:
+    - email
+  properties:
+    email:
+      type: string
+      format: email
+
+PasswordResetConfirmRequest:
+  type: object
+  required:
+    - token
+    - newPassword
+  properties:
+    token:
+      type: string
+      description: Password reset token received via email
+    newPassword:
+      type: string
+      format: password
+      minLength: 8
+    confirmPassword:
+      type: string
+      format: password
+
+Role:
+  type: object
+  required:
+    - id
+    - name
+    - permissions
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+    description:
+      type: string
+    permissions:
+      type: array
+      items:
+        type: string
+    scope:
+      type: string
+      enum: [global, project]
+    isBuiltIn:
+      type: boolean
+      description: Whether this is a built-in system role
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+Group:
+  type: object
+  required:
+    - id
+    - name
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+    description:
+      type: string
+    members:
+      type: array
+      items:
+        type: string
+      description: User IDs in this group
+    roles:
+      type: array
+      items:
+        type: string
+      description: Roles assigned to this group
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+ServiceAccount:
+  type: object
+  required:
+    - id
+    - name
+    - roles
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+    description:
+      type: string
+    roles:
+      type: array
+      items:
+        type: string
+    isActive:
+      type: boolean
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+    lastUsed:
+      type: string
+      format: date-time
+
+ApiToken:
+  type: object
+  required:
+    - id
+    - name
+    - serviceAccountId
+  properties:
+    id:
+      type: string
+    name:
+      type: string
+    description:
+      type: string
+    serviceAccountId:
+      type: string
+    token:
+      type: string
+      description: The actual token (only shown on creation)
+    isActive:
+      type: boolean
+    expiresAt:
+      type: string
+      format: date-time
+    createdAt:
+      type: string
+      format: date-time
+    lastUsed:
+      type: string
+      format: date-time

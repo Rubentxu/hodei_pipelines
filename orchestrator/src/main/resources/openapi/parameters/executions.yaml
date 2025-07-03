@@ -1,0 +1,9 @@
+ExecutionIdParam:
+  name: executionId
+  in: path
+  required: true
+  description: ID único de la ejecución
+  schema:
+    type: string
+    format: uuid
+    example: "abc12345-e89b-12d3-a456-426614174003"

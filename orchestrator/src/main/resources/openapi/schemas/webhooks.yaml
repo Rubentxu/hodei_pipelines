@@ -1,0 +1,492 @@
+WebhookStatus:
+  type: string
+  enum:
+    - active
+    - paused
+    - failed
+    - disabled
+  description: Current status of webhook
+
+WebhookEventType:
+  type: string
+  enum:
+    - job.created
+    - job.started
+    - job.completed
+    - job.failed
+    - job.cancelled
+    - job.retried
+    - execution.started
+    - execution.completed
+    - execution.failed
+    - execution.cancelled
+    - template.published
+    - template.deprecated
+    - pool.created
+    - pool.drained
+    - pool.resumed
+    - worker.registered
+    - worker.terminated
+    - worker.failed
+    - system.maintenance
+  description: Type of event that triggers the webhook
+
+Webhook:
+  type: object
+  required:
+    - id
+    - name
+    - url
+    - events
+    - status
+    - createdAt
+  properties:
+    id:
+      type: string
+      description: Unique webhook identifier
+    name:
+      type: string
+      description: Human-readable webhook name
+    description:
+      type: string
+      description: Webhook description
+    url:
+      type: string
+      format: uri
+      description: Target URL for webhook delivery
+    method:
+      type: string
+      enum: [POST, PUT, PATCH]
+      default: POST
+      description: HTTP method to use
+    events:
+      type: array
+      items:
+        $ref: '#/WebhookEventType'
+      description: Events that trigger this webhook
+    status:
+      $ref: '#/WebhookStatus'
+    headers:
+      type: object
+      additionalProperties:
+        type: string
+      description: Custom headers to include in webhook requests
+    secret:
+      type: string
+      description: Secret for HMAC signature verification
+      writeOnly: true
+    timeout:
+      type: integer
+      minimum: 1
+      maximum: 30
+      default: 10
+      description: Request timeout in seconds
+    retryPolicy:
+      $ref: '#/WebhookRetryPolicy'
+    filters:
+      $ref: '#/WebhookFilters'
+    statistics:
+      $ref: '#/WebhookStatistics'
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+    createdBy:
+      type: string
+
+WebhookRetryPolicy:
+  type: object
+  properties:
+    enabled:
+      type: boolean
+      default: true
+    maxRetries:
+      type: integer
+      minimum: 0
+      maximum: 10
+      default: 3
+    backoffMultiplier:
+      type: number
+      minimum: 1.0
+      maximum: 5.0
+      default: 2.0
+    initialDelay:
+      type: integer
+      minimum: 1
+      maximum: 300
+      default: 5
+      description: Initial delay in seconds
+
+WebhookFilters:
+  type: object
+  properties:
+    projects:
+      type: array
+      items:
+        type: string
+      description: Filter events by project IDs
+    pools:
+      type: array
+      items:
+        type: string
+      description: Filter events by pool IDs
+    users:
+      type: array
+      items:
+        type: string
+      description: Filter events by user IDs
+    tags:
+      type: object
+      additionalProperties:
+        type: string
+      description: Filter events by resource tags
+
+WebhookStatistics:
+  type: object
+  properties:
+    totalDeliveries:
+      type: integer
+    successfulDeliveries:
+      type: integer
+    failedDeliveries:
+      type: integer
+    lastDelivery:
+      type: string
+      format: date-time
+    lastSuccess:
+      type: string
+      format: date-time
+    lastFailure:
+      type: string
+      format: date-time
+    averageResponseTime:
+      type: number
+      format: float
+      description: Average response time in milliseconds
+
+WebhookDelivery:
+  type: object
+  required:
+    - id
+    - webhookId
+    - eventType
+    - status
+    - createdAt
+  properties:
+    id:
+      type: string
+      description: Unique delivery identifier
+    webhookId:
+      type: string
+      description: Webhook that triggered this delivery
+    eventType:
+      $ref: '#/WebhookEventType'
+    eventId:
+      type: string
+      description: ID of the event that triggered this delivery
+    status:
+      type: string
+      enum: [pending, delivered, failed, retrying]
+    attempt:
+      type: integer
+      minimum: 1
+      description: Current attempt number
+    maxAttempts:
+      type: integer
+      description: Maximum attempts configured
+    url:
+      type: string
+      format: uri
+      description: Target URL for this delivery
+    requestHeaders:
+      type: object
+      additionalProperties:
+        type: string
+    requestBody:
+      type: string
+      description: Request payload sent
+    responseStatus:
+      type: integer
+      description: HTTP response status code
+    responseHeaders:
+      type: object
+      additionalProperties:
+        type: string
+    responseBody:
+      type: string
+      description: Response body received
+    responseTime:
+      type: number
+      format: float
+      description: Response time in milliseconds
+    error:
+      type: string
+      description: Error message if delivery failed
+    createdAt:
+      type: string
+      format: date-time
+    deliveredAt:
+      type: string
+      format: date-time
+    nextRetryAt:
+      type: string
+      format: date-time
+
+# Webhook Event Payloads
+WebhookEventPayload:
+  type: object
+  required:
+    - eventId
+    - eventType
+    - timestamp
+    - source
+    - data
+  properties:
+    eventId:
+      type: string
+      description: Unique event identifier
+    eventType:
+      $ref: '#/WebhookEventType'
+    timestamp:
+      type: string
+      format: date-time
+      description: When the event occurred
+    source:
+      type: string
+      description: Source system that generated the event
+      example: "hodei-pipelines"
+    version:
+      type: string
+      description: Event schema version
+      example: "1.0"
+    data:
+      oneOf:
+        - $ref: '#/JobEventData'
+        - $ref: '#/ExecutionEventData'
+        - $ref: '#/TemplateEventData'
+        - $ref: '#/PoolEventData'
+        - $ref: '#/WorkerEventData'
+        - $ref: '#/SystemEventData'
+
+JobEventData:
+  type: object
+  required:
+    - job
+  properties:
+    job:
+      $ref: '../schemas/jobs.yaml#/Job'
+    execution:
+      $ref: '../schemas/executions.yaml#/Execution'
+    user:
+      type: string
+      description: User who triggered the action
+    reason:
+      type: string
+      description: Reason for the action (for cancellations, failures)
+
+ExecutionEventData:
+  type: object
+  required:
+    - execution
+  properties:
+    execution:
+      $ref: '../schemas/executions.yaml#/Execution'
+    job:
+      $ref: '../schemas/jobs.yaml#/Job'
+    worker:
+      $ref: '../schemas/pools.yaml#/Worker'
+    error:
+      type: string
+      description: Error details (for failure events)
+
+TemplateEventData:
+  type: object
+  required:
+    - template
+  properties:
+    template:
+      $ref: '../schemas/templates.yaml#/Template'
+    user:
+      type: string
+      description: User who performed the action
+    changes:
+      type: object
+      description: Changes made (for update events)
+
+PoolEventData:
+  type: object
+  required:
+    - pool
+  properties:
+    pool:
+      $ref: '../schemas/pools.yaml#/Pool'
+    user:
+      type: string
+      description: User who performed the action
+    reason:
+      type: string
+      description: Reason for the action
+
+WorkerEventData:
+  type: object
+  required:
+    - worker
+  properties:
+    worker:
+      $ref: '../schemas/pools.yaml#/Worker'
+    pool:
+      $ref: '../schemas/pools.yaml#/Pool'
+    reason:
+      type: string
+      description: Reason for the action
+
+SystemEventData:
+  type: object
+  properties:
+    component:
+      type: string
+      description: System component affected
+    details:
+      type: object
+      additionalProperties: true
+      description: Additional system event details
+
+# Request/Response DTOs
+CreateWebhookRequest:
+  type: object
+  required:
+    - name
+    - url
+    - events
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    description:
+      type: string
+      maxLength: 1000
+    url:
+      type: string
+      format: uri
+    method:
+      type: string
+      enum: [POST, PUT, PATCH]
+      default: POST
+    events:
+      type: array
+      items:
+        $ref: '#/WebhookEventType'
+      minItems: 1
+    headers:
+      type: object
+      additionalProperties:
+        type: string
+    secret:
+      type: string
+      minLength: 8
+      maxLength: 255
+    timeout:
+      type: integer
+      minimum: 1
+      maximum: 30
+      default: 10
+    retryPolicy:
+      $ref: '#/WebhookRetryPolicy'
+    filters:
+      $ref: '#/WebhookFilters'
+
+UpdateWebhookRequest:
+  type: object
+  properties:
+    name:
+      type: string
+      minLength: 1
+      maxLength: 255
+    description:
+      type: string
+      maxLength: 1000
+    url:
+      type: string
+      format: uri
+    method:
+      type: string
+      enum: [POST, PUT, PATCH]
+    events:
+      type: array
+      items:
+        $ref: '#/WebhookEventType'
+      minItems: 1
+    headers:
+      type: object
+      additionalProperties:
+        type: string
+    secret:
+      type: string
+      minLength: 8
+      maxLength: 255
+    timeout:
+      type: integer
+      minimum: 1
+      maximum: 30
+    retryPolicy:
+      $ref: '#/WebhookRetryPolicy'
+    filters:
+      $ref: '#/WebhookFilters'
+    status:
+      $ref: '#/WebhookStatus'
+
+TestWebhookRequest:
+  type: object
+  properties:
+    eventType:
+      $ref: '#/WebhookEventType'
+    customPayload:
+      type: object
+      description: Custom test payload (optional)
+
+TestWebhookResponse:
+  type: object
+  required:
+    - success
+    - deliveryId
+  properties:
+    success:
+      type: boolean
+    deliveryId:
+      type: string
+    responseStatus:
+      type: integer
+    responseTime:
+      type: number
+      format: float
+    error:
+      type: string
+
+WebhookListResponse:
+  type: object
+  required:
+    - items
+    - pagination
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/Webhook'
+    pagination:
+      $ref: '../schemas/common.yaml#/PaginationMeta'
+
+WebhookDeliveryListResponse:
+  type: object
+  required:
+    - items
+    - pagination
+  properties:
+    items:
+      type: array
+      items:
+        $ref: '#/WebhookDelivery'
+    pagination:
+      $ref: '../schemas/common.yaml#/PaginationMeta'
