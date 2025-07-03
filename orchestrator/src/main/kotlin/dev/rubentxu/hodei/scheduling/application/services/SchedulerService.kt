@@ -8,7 +8,7 @@ import dev.rubentxu.hodei.jobmanagement.domain.entities.Job
 import dev.rubentxu.hodei.resourcemanagement.domain.repositories.ResourcePoolRepository
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePool
 import dev.rubentxu.hodei.resourcemanagement.domain.ports.IResourceMonitor
-import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization
+import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization
 import dev.rubentxu.hodei.scheduling.domain.entities.PoolCandidate
 import dev.rubentxu.hodei.scheduling.domain.entities.SchedulingStrategy
 import dev.rubentxu.hodei.scheduling.infrastructure.scheduling.*
@@ -147,7 +147,7 @@ class SchedulerService(
         return hasEnoughResources(pool, utilization, job).right()
     }
 
-    private suspend fun getPoolUtilization(pool: ResourcePool): Either<String, ResourceUtilization> {
+    private suspend fun getPoolUtilization(pool: ResourcePool): Either<String, ResourcePoolUtilization> {
         val monitor = resourceMonitors[pool.type] 
             ?: return "No resource monitor available for pool type ${pool.type}".left()
 
@@ -164,7 +164,7 @@ class SchedulerService(
 
     private fun hasEnoughResources(
         pool: ResourcePool,
-        utilization: ResourceUtilization,
+        utilization: ResourcePoolUtilization,
         job: Job
     ): Boolean {
         val jobRequirements = job.resourceRequirements

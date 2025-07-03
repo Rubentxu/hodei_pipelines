@@ -16,6 +16,10 @@ dependencies {
 
     // gRPC dependencies
     implementation(libs.grpc.netty.shaded)
+    implementation(libs.grpc.protobuf)
+    implementation(libs.grpc.kotlin.stub)
+    implementation(libs.protobuf.java)
+    implementation(libs.protobuf.kotlin)
     
     // Kotlin scripting dependencies
     implementation(libs.kotlin.scripting.jvm)

@@ -13,16 +13,16 @@ interface IResourceMonitor {
     /**
      * Get current resource utilization for a specific resource pool
      * @param resourcePoolId The ID of the resource pool to monitor
-     * @return ResourceUtilization snapshot
+     * @return ResourcePoolUtilization snapshot
      */
-    suspend fun getUtilization(resourcePoolId: DomainId): arrow.core.Either<String, dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization>
+    suspend fun getUtilization(resourcePoolId: DomainId): arrow.core.Either<String, dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization>
     
     /**
      * Get real-time resource utilization updates for a resource pool
      * @param resourcePoolId The ID of the resource pool to monitor
-     * @return Flow of ResourceUtilization updates
+     * @return Flow of ResourcePoolUtilization updates
      */
-    fun subscribeToResourceUpdates(resourcePoolId: DomainId): Flow<ResourceUtilization>
+    fun subscribeToResourceUpdates(resourcePoolId: DomainId): Flow<dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization>
     
     /**
      * Get capacity information for a resource pool
@@ -73,9 +73,9 @@ interface IResourceMonitor {
 }
 
 /**
- * Current resource utilization snapshot
+ * Current resource utilization snapshot (ports version)
  */
-data class ResourceUtilization(
+data class ResourceUtilizationSnapshot(
     val resourcePoolId: DomainId,
     val timestamp: Instant,
     val cpu: ResourceUsage,

@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.file
+import com.github.ajalt.clikt.parameters.types.int
 import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineEngine
 import dev.rubentxu.hodei.pipelines.dsl.script.PipelineScriptCompiler
 import dev.rubentxu.hodei.pipelines.dsl.model.PipelineExecutionEvent
@@ -12,8 +13,13 @@ import dev.rubentxu.hodei.pipelines.dsl.model.PipelineOutputChunk
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.coroutineScope
 import java.io.File
 import java.util.*
+
+// Additional imports needed for remote execution
+import dev.rubentxu.hodei.pipelines.dsl.cli.client.OrchestratorClient
+import dev.rubentxu.hodei.pipelines.dsl.cli.client.JobSubmissionRequest
 
 /**
  * CLI principal para el Pipeline DSL integrado.
@@ -33,7 +39,7 @@ class PipelineDslCli : CliktCommand(
  */
 class ExecuteCommand : CliktCommand(
     name = "execute",
-    help = "Execute a pipeline script"
+    help = "Execute a pipeline script locally or remotely"
 ) {
     private val pipelineFile by argument(
         name = "PIPELINE_FILE",
@@ -50,6 +56,26 @@ class ExecuteCommand : CliktCommand(
         help = "Worker ID for execution"
     ).default("cli-worker-${System.currentTimeMillis()}")
     
+    private val orchestratorUrl by option(
+        "--orchestrator", "--remote",
+        help = "Orchestrator URL for remote execution (e.g., http://localhost:8080)"
+    )
+    
+    private val resourcePool by option(
+        "--pool",
+        help = "Resource pool ID for remote execution"
+    )
+    
+    private val follow by option(
+        "--follow", "-f",
+        help = "Follow job execution and stream real-time output"
+    ).flag(default = true)
+    
+    private val timeout by option(
+        "--timeout",
+        help = "Execution timeout in seconds"
+    ).int()
+    
     private val verbose by option(
         "--verbose", "-v",
         help = "Enable verbose output"
@@ -59,78 +85,11 @@ class ExecuteCommand : CliktCommand(
         try {
             echo("🚀 Executing pipeline: ${pipelineFile.name}")
             echo("📋 Job ID: $jobId")
-            echo("🔧 Worker ID: $workerId")
-            echo()
             
-            // Compilar el pipeline
-            val compiler = PipelineScriptCompiler()
-            val pipeline = compiler.compileFromFile(pipelineFile.absolutePath)
-            
-            echo("✅ Pipeline compiled successfully: ${pipeline.name}")
-            if (pipeline.description != null) {
-                echo("📄 Description: ${pipeline.description}")
-            }
-            echo("🏗️ Stages: ${pipeline.stages.size}")
-            echo("📦 Total steps: ${pipeline.getTotalStepCount()}")
-            echo()
-            
-            // Crear channels para output y eventos
-            val outputChannel = Channel<PipelineOutputChunk>(Channel.UNLIMITED)
-            val eventChannel = Channel<PipelineExecutionEvent>(Channel.UNLIMITED)
-            
-            // Configurar listeners para output y eventos
-            val outputJob = launch {
-                for (output in outputChannel) {
-                    if (output.isError) {
-                        System.err.write(output.data)
-                        System.err.flush()
-                    } else {
-                        System.out.write(output.data)
-                        System.out.flush()
-                    }
-                }
-            }
-            
-            val eventJob = launch {
-                for (event in eventChannel) {
-                    if (verbose) {
-                        echo("📡 Event: ${event::class.simpleName}")
-                    }
-                }
-            }
-            
-            // Ejecutar el pipeline
-            val executor = PipelineEngine()
-            val result = executor.execute(
-                pipeline = pipeline,
-                jobId = jobId,
-                workerId = workerId,
-                outputChannel = outputChannel,
-                eventChannel = eventChannel
-            )
-            
-            // Cerrar channels
-            outputChannel.close()
-            eventChannel.close()
-            
-            // Esperar a que terminen los jobs de procesamiento
-            outputJob.join()
-            eventJob.join()
-            
-            // Mostrar resultado
-            echo()
-            if (result.success) {
-                echo("✅ Pipeline execution completed successfully!")
-                echo("⏱️ Duration: ${result.duration}ms")
-                echo("🎯 All ${result.stageResults.size} stages completed")
+            if (orchestratorUrl != null) {
+                executeRemotely()
             } else {
-                echo("❌ Pipeline execution failed!")
-                echo("⏱️ Duration: ${result.duration}ms")
-                result.failedStage?.let { echo("💥 Failed stage: $it") }
-                result.error?.let { echo("🔍 Error: $it") }
-                
-                // Exit with error code
-                System.exit(1)
+                executeLocally()
             }
             
         } catch (e: Exception) {
@@ -138,6 +97,227 @@ class ExecuteCommand : CliktCommand(
             if (verbose) {
                 e.printStackTrace()
             }
+            System.exit(1)
+        }
+    }
+    
+    private suspend fun executeRemotely() {
+        echo("🌐 Remote execution via orchestrator: $orchestratorUrl")
+        echo("🔧 Worker ID: $workerId")
+        resourcePool?.let { echo("🏊 Resource Pool: $it") }
+        echo()
+        
+        // Read pipeline content
+        val pipelineContent = pipelineFile.readText()
+        
+        // Create orchestrator client
+        val client = OrchestratorClient(baseUrl = orchestratorUrl!!)
+        
+        try {
+            // Check orchestrator health
+            val healthResult = client.healthCheck()
+            if (healthResult.isFailure) {
+                echo("❌ Cannot connect to orchestrator: ${healthResult.exceptionOrNull()?.message}")
+                System.exit(1)
+            }
+            
+            val health = healthResult.getOrThrow()
+            echo("✅ Connected to orchestrator (${health.status})")
+            health.version?.let { echo("📦 Version: $it") }
+            echo()
+            
+            // Submit job
+            val jobRequest = JobSubmissionRequest(
+                name = pipelineFile.nameWithoutExtension,
+                description = "Pipeline executed from CLI",
+                pipelineContent = pipelineContent,
+                type = "pipeline",
+                priority = "normal",
+                resourcePoolId = resourcePool,
+                metadata = mapOf(
+                    "submittedBy" to "cli",
+                    "clientJobId" to jobId,
+                    "workerId" to workerId
+                ),
+                timeout = timeout?.toLong()?.times(1000) // Convert to milliseconds
+            )
+            
+            echo("📤 Submitting job to orchestrator...")
+            val submissionResult = client.submitJob(jobRequest)
+            
+            if (submissionResult.isFailure) {
+                echo("❌ Failed to submit job: ${submissionResult.exceptionOrNull()?.message}")
+                System.exit(1)
+            }
+            
+            val submission = submissionResult.getOrThrow()
+            val remoteJobId = submission.jobId
+            echo("✅ Job submitted successfully!")
+            echo("🆔 Remote Job ID: $remoteJobId")
+            echo("📊 Status: ${submission.status}")
+            submission.queuePosition?.let { echo("📍 Queue Position: $it") }
+            submission.estimatedDuration?.let { echo("⏱️ Estimated Duration: ${it}s") }
+            echo()
+            
+            if (follow) {
+                echo("👀 Following job execution...")
+                echo("Press Ctrl+C to stop following (job will continue running)")
+                echo()
+                
+                // Stream real-time updates
+                val streamJob = kotlinx.coroutines.GlobalScope.launch {
+                    client.streamJobUpdates(remoteJobId).collect { update ->
+                        when (update.type) {
+                            dev.rubentxu.hodei.pipelines.dsl.cli.client.UpdateType.STATUS_CHANGE -> {
+                                echo("📊 Status: ${update.message}")
+                            }
+                            dev.rubentxu.hodei.pipelines.dsl.cli.client.UpdateType.LOG_OUTPUT -> {
+                                print(update.message)
+                            }
+                            dev.rubentxu.hodei.pipelines.dsl.cli.client.UpdateType.PROGRESS -> {
+                                echo("📈 Progress: ${update.message}")
+                            }
+                            dev.rubentxu.hodei.pipelines.dsl.cli.client.UpdateType.ERROR -> {
+                                echo("❌ Error: ${update.message}")
+                            }
+                            dev.rubentxu.hodei.pipelines.dsl.cli.client.UpdateType.COMPLETION -> {
+                                echo("🎯 ${update.message}")
+                            }
+                        }
+                    }
+                }
+                
+                // Poll status periodically as fallback
+                var lastStatus = submission.status
+                var completed = false
+                
+                while (!completed) {
+                    kotlinx.coroutines.delay(5000) // Poll every 5 seconds
+                    
+                    val statusResult = client.getJobStatus(remoteJobId)
+                    if (statusResult.isSuccess) {
+                        val status = statusResult.getOrThrow()
+                        
+                        if (status.status != lastStatus) {
+                            lastStatus = status.status
+                            echo("📊 Status Update: ${status.status}")
+                            status.currentStep?.let { echo("🔧 Current Step: $it") }
+                            status.progress?.let { echo("📈 Progress: ${(it * 100).toInt()}%") }
+                        }
+                        
+                        completed = status.status in listOf("completed", "failed", "cancelled")
+                        
+                        if (completed) {
+                            streamJob.cancel()
+                            
+                            echo()
+                            echo("🏁 Execution completed!")
+                            echo("📊 Final Status: ${status.status}")
+                            status.duration?.let { echo("⏱️ Duration: ${it}ms") }
+                            status.workerId?.let { echo("🔧 Worker: $it") }
+                            
+                            // Get final logs
+                            val logsResult = client.getJobLogs(remoteJobId)
+                            if (logsResult.isSuccess) {
+                                val logs = logsResult.getOrThrow()
+                                if (logs.logs.isNotEmpty()) {
+                                    echo()
+                                    echo("📜 Final Logs:")
+                                    logs.logs.takeLast(10).forEach { log ->
+                                        echo("${log.timestamp} [${log.level}] ${log.message}")
+                                    }
+                                }
+                            }
+                            
+                            if (status.status == "failed") {
+                                System.exit(1)
+                            }
+                        }
+                    }
+                }
+            } else {
+                echo("✅ Job submitted. Use --follow to stream execution output.")
+                echo("🆔 Job ID: $remoteJobId")
+            }
+            
+        } finally {
+            client.close()
+        }
+    }
+    
+    private suspend fun executeLocally() {
+        echo("💻 Local execution")
+        echo("🔧 Worker ID: $workerId")
+        echo()
+        
+        // Compilar el pipeline
+        val compiler = PipelineScriptCompiler()
+        val pipeline = compiler.compileFromFile(pipelineFile.absolutePath)
+        
+        echo("✅ Pipeline compiled successfully: ${pipeline.name}")
+        if (pipeline.description != null) {
+            echo("📄 Description: ${pipeline.description}")
+        }
+        echo("🏗️ Stages: ${pipeline.stages.size}")
+        echo("📦 Total steps: ${pipeline.getTotalStepCount()}")
+        echo()
+        
+        // Crear channels para output y eventos
+        val outputChannel = Channel<PipelineOutputChunk>(Channel.UNLIMITED)
+        val eventChannel = Channel<PipelineExecutionEvent>(Channel.UNLIMITED)
+        
+        // Configurar listeners para output y eventos
+        val outputJob = kotlinx.coroutines.GlobalScope.launch {
+            for (output in outputChannel) {
+                if (output.isError) {
+                    System.err.write(output.data)
+                    System.err.flush()
+                } else {
+                    System.out.write(output.data)
+                    System.out.flush()
+                }
+            }
+        }
+        
+        val eventJob = kotlinx.coroutines.GlobalScope.launch {
+            for (event in eventChannel) {
+                if (verbose) {
+                    echo("📡 Event: ${event::class.simpleName}")
+                }
+            }
+        }
+        
+        // Ejecutar el pipeline
+        val executor = PipelineEngine()
+        val result = executor.execute(
+            pipeline = pipeline,
+            jobId = jobId,
+            workerId = workerId,
+            outputChannel = outputChannel,
+            eventChannel = eventChannel
+        )
+        
+        // Cerrar channels
+        outputChannel.close()
+        eventChannel.close()
+        
+        // Esperar a que terminen los jobs de procesamiento
+        outputJob.join()
+        eventJob.join()
+        
+        // Mostrar resultado
+        echo()
+        if (result.success) {
+            echo("✅ Pipeline execution completed successfully!")
+            echo("⏱️ Duration: ${result.duration}ms")
+            echo("🎯 All ${result.stageResults.size} stages completed")
+        } else {
+            echo("❌ Pipeline execution failed!")
+            echo("⏱️ Duration: ${result.duration}ms")
+            result.failedStage?.let { echo("💥 Failed stage: $it") }
+            result.error?.let { echo("🔍 Error: $it") }
+            
+            // Exit with error code
             System.exit(1)
         }
     }

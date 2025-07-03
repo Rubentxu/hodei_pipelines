@@ -11,7 +11,6 @@ import dev.rubentxu.hodei.resourcemanagement.domain.ports.ResourceAvailability
 import dev.rubentxu.hodei.resourcemanagement.domain.ports.ResourceCapacity
 import dev.rubentxu.hodei.resourcemanagement.domain.ports.ResourceMetric
 import dev.rubentxu.hodei.resourcemanagement.domain.ports.ResourceRequest
-import dev.rubentxu.hodei.resourcemanagement.domain.ports.ResourceUtilization
 import dev.rubentxu.hodei.resourcemanagement.domain.ports.ResourceUsage
 import dev.rubentxu.hodei.resourcemanagement.domain.ports.ResourceUnit
 import dev.rubentxu.hodei.resourcemanagement.domain.ports.NetworkUsage
@@ -77,7 +76,7 @@ class KubernetesResourceMonitor(
         )
     )
     
-    override suspend fun getUtilization(resourcePoolId: DomainId): Either<String, dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization> = 
+    override suspend fun getUtilization(resourcePoolId: DomainId): Either<String, dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization> = 
         withContext(Dispatchers.IO) {
             try {
                 logger.debug("Getting resource utilization for Kubernetes pool: ${resourcePoolId.value}")
@@ -92,7 +91,7 @@ class KubernetesResourceMonitor(
                 // - kubectl get pods -n $namespace --field-selector=status.phase=Running
                 // - metrics-server API
                 
-                val utilization = dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization(
+                val utilization = dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization(
                     poolId = resourcePoolId,
                     totalCpu = resources.totalCpu,
                     usedCpu = resources.usedCpu,
@@ -117,41 +116,24 @@ class KubernetesResourceMonitor(
             }
         }
 
-    override fun subscribeToResourceUpdates(resourcePoolId: DomainId): Flow<ResourceUtilization> = flow {
+    override fun subscribeToResourceUpdates(resourcePoolId: DomainId): Flow<dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization> = flow {
         while (true) {
             try {
                 val namespace = extractNamespace(resourcePoolId.value)
                 val resources = mockNamespaceResources[namespace]
                 
                 if (resources != null) {
-                    val utilization = ResourceUtilization(
-                        resourcePoolId = resourcePoolId,
-                        timestamp = Clock.System.now(),
-                        cpu = ResourceUsage(
-                            used = (resources.usedCpu * 1000).toLong(), // Convert to millicores
-                            total = (resources.totalCpu * 1000).toLong(),
-                            percentage = (resources.usedCpu / resources.totalCpu) * 100,
-                            unit = ResourceUnit.CORES
-                        ),
-                        memory = ResourceUsage(
-                            used = (resources.usedMemoryGi * 1024).toLong(), // Convert to MB
-                            total = (resources.totalMemoryGi * 1024).toLong(),
-                            percentage = (resources.usedMemoryGi / resources.totalMemoryGi) * 100,
-                            unit = ResourceUnit.MEGABYTES
-                        ),
-                        storage = ResourceUsage(
-                            used = 0L,
-                            total = 0L,
-                            percentage = 0.0,
-                            unit = ResourceUnit.GIGABYTES
-                        ),
-                        network = NetworkUsage(
-                            inboundBytesPerSecond = 0L,
-                            outboundBytesPerSecond = 0L,
-                            connectionsCount = 0
-                        ),
-                        activeInstances = resources.runningPods,
-                        totalInstances = resources.maxPods
+                    val utilization = dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization(
+                        poolId = resourcePoolId,
+                        totalCpu = resources.totalCpu,
+                        usedCpu = resources.usedCpu,
+                        totalMemoryBytes = (resources.totalMemoryGi * 1024 * 1024 * 1024).toLong(),
+                        usedMemoryBytes = (resources.usedMemoryGi * 1024 * 1024 * 1024).toLong(),
+                        totalDiskBytes = 0L, // Not tracked at namespace level in K8s
+                        usedDiskBytes = 0L,
+                        runningJobs = resources.runningPods,
+                        queuedJobs = 0,
+                        timestamp = Clock.System.now()
                     )
                     
                     emit(utilization)

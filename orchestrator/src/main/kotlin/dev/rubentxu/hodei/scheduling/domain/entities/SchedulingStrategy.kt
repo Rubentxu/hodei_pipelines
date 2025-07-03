@@ -3,7 +3,7 @@ package dev.rubentxu.hodei.scheduling.domain.entities
 import arrow.core.Either
 import dev.rubentxu.hodei.jobmanagement.domain.entities.Job
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePool
-import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization
+import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization
 
 /**
  * Strategy interface for job placement algorithms.
@@ -34,6 +34,6 @@ interface SchedulingStrategy {
  */
 data class PoolCandidate(
     val pool: ResourcePool,
-    val utilization: ResourceUtilization,
+    val utilization: ResourcePoolUtilization,
     val score: Double = 0.0  // Optional score for ranking
 )

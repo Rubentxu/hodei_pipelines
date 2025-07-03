@@ -10,6 +10,15 @@ import dev.rubentxu.hodei.resourcemanagement.domain.ports.IInstanceManager
 import dev.rubentxu.hodei.resourcemanagement.domain.ports.IResourceMonitor
 import dev.rubentxu.hodei.resourcemanagement.infrastructure.kubernetes.KubernetesInstanceManager
 import dev.rubentxu.hodei.resourcemanagement.infrastructure.kubernetes.KubernetesResourceMonitor
+import dev.rubentxu.hodei.resourcemanagement.infrastructure.docker.DockerInstanceManager
+import dev.rubentxu.hodei.resourcemanagement.infrastructure.docker.DockerResourceMonitor
+import dev.rubentxu.hodei.resourcemanagement.infrastructure.docker.DockerEnvironmentBootstrap
+import dev.rubentxu.hodei.resourcemanagement.infrastructure.docker.DockerConfig
+import com.github.dockerjava.api.DockerClient
+import com.github.dockerjava.core.DefaultDockerClientConfig
+import com.github.dockerjava.core.DockerClientBuilder
+import com.github.dockerjava.httpclient5.ApacheDockerHttpClient
+import java.time.Duration
 import dev.rubentxu.hodei.domain.worker.WorkerFactory
 import dev.rubentxu.hodei.infrastructure.worker.DefaultWorkerFactory
 import dev.rubentxu.hodei.resourcemanagement.application.services.ResourcePoolService
@@ -53,9 +62,62 @@ val appModule = module {
     single<PermissionRepository> { InMemoryPermissionRepository() }
     single<AuditRepository> { InMemoryAuditRepository() }
     
+    // Docker Client configuration
+    single<DockerConfig> { DockerConfig() }
+    
+    single<DockerClient> {
+        val config = get<DockerConfig>()
+        val clientConfig = DefaultDockerClientConfig.createDefaultConfigBuilder()
+            .withDockerHost(config.dockerHost)
+            .withDockerTlsVerify(config.tlsVerify)
+            .also { builder ->
+                config.certPath?.let { builder.withDockerCertPath(it) }
+            }
+            .withApiVersion(config.apiVersion)
+            .build()
+
+        val httpClient = ApacheDockerHttpClient.Builder()
+            .dockerHost(clientConfig.dockerHost)
+            .sslConfig(clientConfig.sslConfig)
+            .maxConnections(config.maxConnections)
+            .connectionTimeout(Duration.ofSeconds(config.connectionTimeoutSeconds))
+            .responseTimeout(Duration.ofSeconds(config.responseTimeoutSeconds))
+            .build()
+
+        DockerClientBuilder.getInstance(clientConfig)
+            .withDockerHttpClient(httpClient)
+            .build()
+    }
+    
     // Infrastructure adapters - Ports implementations
-    single<IInstanceManager> { KubernetesInstanceManager() }
-    single<IResourceMonitor> { KubernetesResourceMonitor() }
+    // Configuration-based selection between Docker and Kubernetes
+    single<IInstanceManager> { 
+        val infraType = System.getProperty("hodei.infrastructure.type", "docker")
+        when (infraType.lowercase()) {
+            "kubernetes", "k8s" -> KubernetesInstanceManager()
+            "docker" -> DockerInstanceManager(get())
+            else -> {
+                println("Unknown infrastructure type: $infraType. Defaulting to Docker.")
+                DockerInstanceManager(get())
+            }
+        }
+    }
+    
+    single<IResourceMonitor> { 
+        val infraType = System.getProperty("hodei.infrastructure.type", "docker")
+        when (infraType.lowercase()) {
+            "kubernetes", "k8s" -> KubernetesResourceMonitor()
+            "docker" -> DockerResourceMonitor(get(), get())
+            else -> {
+                println("Unknown infrastructure type: $infraType. Defaulting to Docker.")
+                DockerResourceMonitor(get(), get())
+            }
+        }
+    }
+    
+    // Docker Environment Bootstrap for auto-discovery
+    single { DockerEnvironmentBootstrap(get()) }
+    
     single<WorkerFactory> { DefaultWorkerFactory(get(), get()) }
     
     // Application services

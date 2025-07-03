@@ -42,7 +42,7 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import dev.rubentxu.hodei.infrastructure.grpc.MockWorkerCommunicationService
 import dev.rubentxu.hodei.resourcemanagement.domain.ports.IResourceMonitor
-import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization
+import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization
 import kotlinx.datetime.Clock
 
 /**

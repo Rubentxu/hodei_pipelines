@@ -11,7 +11,7 @@ import dev.rubentxu.hodei.resourcemanagement.domain.ports.IResourceMonitor
 import dev.rubentxu.hodei.resourcemanagement.domain.repositories.ResourcePoolRepository
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.PoolStatus
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePool
-import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization
+import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization
 import dev.rubentxu.hodei.scheduling.infrastructure.scheduling.*
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
@@ -364,8 +364,8 @@ class SchedulingStrategiesIntegrationTest {
         usedMemoryBytes: Long = 4_000_000_000,
         runningJobs: Int = 2,
         queuedJobs: Int = 0
-    ): ResourceUtilization {
-        return ResourceUtilization(
+    ): ResourcePoolUtilization {
+        return ResourcePoolUtilization(
             poolId = DomainId.generate(),
             totalCpu = totalCpu,
             usedCpu = usedCpu,
@@ -379,7 +379,7 @@ class SchedulingStrategiesIntegrationTest {
         )
     }
     
-    private fun setupPoolUtilizations(vararg poolUtilizations: Pair<ResourcePool, ResourceUtilization>) {
+    private fun setupPoolUtilizations(vararg poolUtilizations: Pair<ResourcePool, ResourcePoolUtilization>) {
         poolUtilizations.forEach { (pool, utilization) ->
             coEvery { kubernetesMonitor.getUtilization(pool.id) } returns 
                 utilization.copy(poolId = pool.id).right()

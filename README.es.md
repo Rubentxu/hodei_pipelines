@@ -423,3 +423,18 @@ Este proyecto utiliza un "Registro de Conocimiento" para mantener una documentac
 
 Este proyecto está licenciado bajo la Licencia MIT. Consulta el archivo `LICENSE` para más detalles. (Nota: Este archivo es un marcador de posición).
 
+---
+
+Analiza el siguiente fragmento de código del proyecto. Basándote en tu rol como experto en Connascence, realiza un informe completo.
+
+Tu informe debe incluir:
+- **Resumen de Acoplamiento:** Una visión general del nivel de acoplamiento que percibes en el código.
+- **Detección de Connascence por Tipo:**
+  - **Connascence de Nombre/Tipo:** ¿Hay clases con demasiadas dependencias (alto Fan-Out o CBO)?
+  - **Connascence de Posición:** ¿Existen métodos con listas de parámetros largas o "Data Clumps" que podrían ser extraídos a su propia clase?
+  - **Connascence de Algoritmo:** ¿Hay indicios de lógica duplicada que debería ser centralizada?
+  - **Connascence de Significado/Convención:** ¿Detectas "números mágicos" o "strings mágicos" cuyo significado es implícito?
+- **Sugerencias de Refactorización:** Para los puntos más problemáticos, propón cambios específicos en el código para mejorar el diseño y reducir el acoplamiento. Explica el "antes" y el "después" en términos de tipos de connascence.
+
+A partir de tu informe, proporciona sugerencias de refactorización para mejorar el acoplamiento y el disenño del código. 
+Como paso final, idea un plan de refactorización para mejorar el acoplamiento y el diseño del código.

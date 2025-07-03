@@ -23,6 +23,9 @@ detekt = "1.23.7"
 ktlint = "12.1.2"
 auth0-jwt = "4.5.0"
 jbcrypt = "0.4"
+docker-java = "3.4.1"
+docker-java-transport-httpclient5 = "3.4.1"
+clikt = "4.2.2"
 
 [libraries]
 # Ktor
@@ -95,6 +98,13 @@ protobuf-kotlin = { module = "com.google.protobuf:protobuf-kotlin", version.ref 
 # Security/Authentication
 auth0-jwt = { module = "com.auth0:java-jwt", version.ref = "auth0-jwt" }
 jbcrypt = { module = "org.mindrot:jbcrypt", version.ref = "jbcrypt" }
+
+# Docker
+docker-java-core = { module = "com.github.docker-java:docker-java-core", version.ref = "docker-java" }
+docker-java-transport-httpclient5 = { module = "com.github.docker-java:docker-java-transport-httpclient5", version.ref = "docker-java-transport-httpclient5" }
+
+# CLI
+clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
 
 # Testing
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

@@ -10,6 +10,20 @@ dependencies {
     implementation("com.github.ajalt.clikt:clikt:4.2.2")
     implementation(libs.kotlinx.coroutines.core)
     
+    // Ktor Client for HTTP communication with orchestrator
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation("io.ktor:ktor-client-cio:${libs.versions.ktor.get()}")
+    implementation("io.ktor:ktor-client-websockets:${libs.versions.ktor.get()}")
+    implementation("io.ktor:ktor-client-logging:${libs.versions.ktor.get()}")
+    
+    // JSON serialization
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.datetime)
+    
+    // Logging
+    implementation("org.slf4j:slf4j-simple:2.0.12")
 
 }
 

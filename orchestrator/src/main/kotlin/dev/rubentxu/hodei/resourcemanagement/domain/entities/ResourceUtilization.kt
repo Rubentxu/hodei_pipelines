@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
  * Resource utilization information for a resource pool
  */
 @Serializable
-data class ResourceUtilization(
+data class ResourcePoolUtilization(
     val poolId: DomainId,
     val totalCpu: Double,
     val usedCpu: Double,

@@ -11,7 +11,7 @@ import dev.rubentxu.hodei.resourcemanagement.domain.ports.IResourceMonitor
 import dev.rubentxu.hodei.resourcemanagement.domain.repositories.ResourcePoolRepository
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.PoolStatus
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePool
-import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization
+import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization
 import dev.rubentxu.hodei.scheduling.domain.entities.PoolCandidate
 import dev.rubentxu.hodei.scheduling.infrastructure.scheduling.*
 import io.mockk.*
@@ -184,8 +184,8 @@ class SimpleSchedulerTest {
     private fun createUtilization(
         totalCpu: Double = 10.0,
         usedCpu: Double = 5.0
-    ): ResourceUtilization {
-        return ResourceUtilization(
+    ): ResourcePoolUtilization {
+        return ResourcePoolUtilization(
             poolId = DomainId.generate(),
             totalCpu = totalCpu,
             usedCpu = usedCpu,

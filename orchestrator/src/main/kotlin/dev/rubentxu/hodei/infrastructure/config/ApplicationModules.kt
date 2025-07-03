@@ -29,6 +29,7 @@ import org.koin.ktor.ext.inject
 
 fun Application.configureModules() {
     configureDependencyInjection()
+    configureDockerEnvironment()
     configureSerialization()
     configureHTTP()
     configureMonitoring()
@@ -147,6 +148,11 @@ fun Application.configureGrpcServer() {
     environment.monitor.subscribe(ApplicationStopped) {
         grpcServerManager.shutdown()
     }
+}
+
+fun Application.configureDockerEnvironment() {
+    val dockerStartup = DockerStartupConfiguration()
+    dockerStartup.initialize()
 }
 
 private fun generateCorrelationId(): String = UUID.randomUUID().toString()

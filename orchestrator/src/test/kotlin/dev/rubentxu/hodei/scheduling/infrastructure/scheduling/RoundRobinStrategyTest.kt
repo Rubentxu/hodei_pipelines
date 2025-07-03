@@ -9,7 +9,7 @@ import dev.rubentxu.hodei.jobmanagement.domain.entities.JobStatus
 import dev.rubentxu.hodei.jobmanagement.domain.entities.JobType
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.PoolStatus
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePool
-import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization
+import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization
 import dev.rubentxu.hodei.scheduling.domain.entities.PoolCandidate
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
@@ -193,8 +193,8 @@ class RoundRobinStrategyTest {
         )
     }
     
-    private fun createUtilization(): ResourceUtilization {
-        return ResourceUtilization(
+    private fun createUtilization(): ResourcePoolUtilization {
+        return ResourcePoolUtilization(
             poolId = DomainId.generate(),
             totalCpu = 10.0,
             usedCpu = 5.0,

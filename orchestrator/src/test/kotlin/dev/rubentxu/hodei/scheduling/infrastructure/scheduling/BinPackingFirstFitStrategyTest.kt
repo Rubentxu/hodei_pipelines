@@ -7,7 +7,7 @@ import dev.rubentxu.hodei.jobmanagement.domain.entities.JobStatus
 import dev.rubentxu.hodei.jobmanagement.domain.entities.JobType
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.PoolStatus
 import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePool
-import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization
+import dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization
 import dev.rubentxu.hodei.scheduling.domain.entities.PoolCandidate
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Clock
@@ -279,8 +279,8 @@ class BinPackingFirstFitStrategyTest {
         usedCpu: Double = 5.0,
         totalMemoryBytes: Long = 8_000_000_000,
         usedMemoryBytes: Long = 4_000_000_000
-    ): ResourceUtilization {
-        return ResourceUtilization(
+    ): ResourcePoolUtilization {
+        return ResourcePoolUtilization(
             poolId = DomainId.generate(),
             totalCpu = totalCpu,
             usedCpu = usedCpu,

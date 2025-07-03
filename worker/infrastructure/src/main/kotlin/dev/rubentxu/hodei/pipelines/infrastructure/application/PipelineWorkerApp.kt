@@ -1,8 +1,9 @@
 package dev.rubentxu.hodei.pipelines.infrastructure.application
 
-import dev.rubentxu.hodei.pipelines.infrastructure.script.PipelineScriptExecutor
-import dev.rubentxu.hodei.pipelines.infrastructure.worker.PipelineWorker
+import dev.rubentxu.hodei.pipelines.dsl.execution.PipelineEngine
+import dev.rubentxu.hodei.pipelines.infrastructure.grpc.WorkerGrpcClient
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
 import mu.KotlinLogging
 import kotlin.system.exitProcess
 
@@ -50,18 +51,25 @@ object PipelineWorkerApp {
             logger.info { "  Capabilities: ${config.capabilities}" }
             
             // Create and start worker
-            val scriptExecutor = PipelineScriptExecutor()
-            val worker = PipelineWorker(
+            val pipelineEngine = PipelineEngine()
+            val workerClient = WorkerGrpcClient(
                 workerId = config.workerId,
-                workerName = config.workerName,
                 serverHost = config.serverHost,
                 serverPort = config.serverPort,
-                scriptExecutor = scriptExecutor
+                pipelineEngine = pipelineEngine
             )
             
-            // Start worker in blocking mode
+            // Connect to orchestrator and keep alive
             runBlocking {
-                worker.start()
+                workerClient.connect()
+                
+                // Keep the worker running
+                while (workerClient.isConnected()) {
+                    delay(1000)
+                }
+                
+                logger.info { "Worker disconnected, shutting down" }
+                workerClient.close()
             }
             
         } catch (e: Exception) {

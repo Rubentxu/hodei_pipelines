@@ -41,7 +41,7 @@ class GreedyBestFitStrategy : SchedulingStrategy {
         return selected.right()
     }
     
-    private fun calculateUtilizationScore(utilization: dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourceUtilization): Double {
+    private fun calculateUtilizationScore(utilization: dev.rubentxu.hodei.resourcemanagement.domain.entities.ResourcePoolUtilization): Double {
         val cpuUtilization = if (utilization.totalCpu > 0) {
             utilization.usedCpu / utilization.totalCpu
         } else 0.0
