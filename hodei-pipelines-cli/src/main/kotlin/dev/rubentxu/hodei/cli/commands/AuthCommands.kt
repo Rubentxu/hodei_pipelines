@@ -71,10 +71,10 @@ class LoginCommand : CliktCommand(
                         onSuccess = {
                             echo("✅ Authentication successful!")
                             echo("")
-                            echo("👤 User: ${loginResponse.user.username}")
+                            echo("👤 User: ${loginResponse.user?.username ?: "unknown"}")
                             echo("🌐 Server: $url")
                             echo("🎯 Context: ${authManager.getCurrentContext()}")
-                            echo("⏰ Token expires in: ${loginResponse.expiresIn}s")
+                            echo("⏰ Token expires in: ${loginResponse.expiresIn ?: "unknown"}s")
                             echo("")
                             echo("🚀 You can now use hp commands:")
                             echo("   hp pool list")

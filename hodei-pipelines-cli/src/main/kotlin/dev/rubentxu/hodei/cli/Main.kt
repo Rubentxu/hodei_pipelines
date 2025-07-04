@@ -117,7 +117,8 @@ fun main(args: Array<String>) {
                 PoolListCommand(),
                 PoolCreateCommand(),
                 PoolDeleteCommand(),
-                PoolStatusCommand()
+                PoolStatusCommand(),
+                PoolDescribeCommand()
             ),
             
             // Job management
@@ -126,20 +127,27 @@ fun main(args: Array<String>) {
                 JobSubmitCommand(),
                 JobStatusCommand(),
                 JobLogsCommand(),
-                JobCancelCommand()
+                JobCancelCommand(),
+                JobDescribeCommand(),
+                JobExecCommand(),
+                JobShellCommand()
             ),
             
             // Worker management
             WorkerCommand().subcommands(
                 WorkerListCommand(),
-                WorkerStatusCommand()
+                WorkerStatusCommand(),
+                WorkerDescribeCommand(),
+                WorkerExecCommand(),
+                WorkerShellCommand()
             ),
             
             // Template management
             TemplateCommand().subcommands(
                 TemplateListCommand(),
                 TemplateCreateCommand(),
-                TemplateShowCommand()
+                TemplateShowCommand(),
+                TemplateDescribeCommand()
             ),
             
             // Docker integration

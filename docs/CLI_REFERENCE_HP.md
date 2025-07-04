@@ -2,6 +2,8 @@
 
 The Hodei Pipelines CLI (`hp`) is a command-line client for interacting with the Hodei orchestrator. Similar to `kubectl` or `oc`, it provides a complete interface for managing distributed job execution, resource pools, workers, and templates.
 
+> **Note**: This document covers the full roadmap of CLI features. Features marked with 🚧 are planned but not yet implemented.
+
 ## Installation
 
 ### Prerequisites
@@ -172,48 +174,82 @@ hp pool list --filter docker
 Create a new resource pool.
 
 ```bash
-hp pool create <name> [options]
+hp pool create [options]
 ```
 
-**Arguments:**
-- `name`: Name of the resource pool
-
 **Options:**
-- `--type`: Pool type (docker, kubernetes, vm)
-- `--max-workers`: Maximum number of workers
-- `--config`: Configuration file (JSON/YAML)
+- `--name`: Name of the resource pool (required)
+- `--type`: Pool type (docker, kubernetes) (default: docker)
+- `--max-workers`: Maximum number of workers (default: 5)
+- `--provider`: Provider (docker, local) (default: docker)
+- `--dry-run`: Validate configuration without creating
 
 **Examples:**
 ```bash
 # Create Docker pool
-hp pool create my-docker-pool --type docker --max-workers 5
+hp pool create --name my-docker-pool --type docker --max-workers 5
 
-# Create from config file
-hp pool create k8s-pool --config pool-config.yaml
+# Create with dry-run validation
+hp pool create --name test-pool --dry-run
+
+# Create with custom provider
+hp pool create --name k8s-pool --type kubernetes --provider local
 ```
 
 ### pool delete
 Delete a resource pool.
 
 ```bash
-hp pool delete <name>
+hp pool delete <pool-id> [options]
 ```
+
+**Arguments:**
+- `pool-id`: ID of the resource pool to delete
+
+**Options:**
+- `--force, -f`: Force deletion without confirmation
 
 **Examples:**
 ```bash
-hp pool delete my-docker-pool
+# Delete with confirmation
+hp pool delete pool-12345
+
+# Force delete without confirmation
+hp pool delete pool-12345 --force
 ```
 
 ### pool status
 Show detailed status of a resource pool.
 
 ```bash
-hp pool status <name>
+hp pool status <pool-id>
 ```
 
 **Examples:**
 ```bash
-hp pool status default-docker-pool
+hp pool status pool-12345
+```
+
+### pool describe
+Show comprehensive information about a resource pool (similar to kubectl describe).
+
+```bash
+hp pool describe <pool-id> [options]
+```
+
+**Arguments:**
+- `pool-id`: ID of the resource pool
+
+**Options:**
+- `--output, -o`: Output format (text, json)
+
+**Examples:**
+```bash
+# Detailed pool information
+hp pool describe pool-12345
+
+# JSON output
+hp pool describe pool-12345 -o json
 ```
 
 ## Job Commands
@@ -254,11 +290,10 @@ hp job submit <pipeline-file> [options]
 
 **Options:**
 - `--name`: Job name (auto-generated if not provided)
-- `--pool`: Target resource pool
-- `--template`: Worker template to use
-- `--parameters`: Job parameters (JSON string or @file)
-- `--wait`: Wait for job completion
-- `--timeout`: Timeout for waiting (e.g., 30m, 1h)
+- `--pool`: Target resource pool ID
+- `--priority`: Job priority (low, normal, high) (default: normal)
+- `--timeout`: Job timeout in seconds
+- `--dry-run`: Validate pipeline without submitting
 
 **Examples:**
 ```bash
@@ -266,16 +301,13 @@ hp job submit <pipeline-file> [options]
 hp job submit my-pipeline.kts
 
 # Submit with custom name and pool
-hp job submit build.kts --name "build-v1.2.3" --pool production
+hp job submit build.kts --name "build-v1.2.3" --pool pool-12345
 
-# Submit and wait for completion
-hp job submit test.kts --wait --timeout 30m
+# Submit with dry-run validation
+hp job submit test.kts --dry-run
 
-# Submit with parameters
-hp job submit deploy.kts --parameters '{"env": "staging", "version": "1.0.0"}'
-
-# Submit with parameters from file
-hp job submit deploy.kts --parameters @params.json
+# Submit with priority and timeout
+hp job submit deploy.kts --priority high --timeout 3600
 ```
 
 ### job status
@@ -291,42 +323,124 @@ hp job status 12345-abcde-67890
 ```
 
 ### job logs
-Show logs for a job.
+Show logs for a job with real-time streaming support.
 
 ```bash
 hp job logs <job-id> [options]
 ```
 
 **Options:**
-- `--follow, -f`: Follow log output
-- `--lines`: Number of lines to show
-- `--since`: Show logs since timestamp (e.g., 1h, 30m)
+- `--follow, -f`: Follow log output (real-time streaming)
+- `--tail, -n`: Number of lines to show from the end
+- `--since`: Show logs since timestamp
 
 **Examples:**
 ```bash
 # Show job logs
-hp job logs 12345-abcde-67890
+hp job logs job-12345
 
-# Follow logs
-hp job logs 12345-abcde-67890 -f
+# Follow logs in real-time
+hp job logs job-12345 -f
 
 # Show last 100 lines
-hp job logs 12345-abcde-67890 --lines 100
+hp job logs job-12345 --tail 100
 
-# Show logs from last hour
-hp job logs 12345-abcde-67890 --since 1h
+# Show logs since specific time
+hp job logs job-12345 --since 2024-01-01T10:00:00Z
 ```
 
 ### job cancel
 Cancel a running job.
 
 ```bash
-hp job cancel <job-id>
+hp job cancel <job-id> [options]
 ```
+
+**Arguments:**
+- `job-id`: ID of the job to cancel
+
+**Options:**
+- `--reason`: Reason for cancellation
+- `--force, -f`: Force cancellation without confirmation
 
 **Examples:**
 ```bash
-hp job cancel 12345-abcde-67890
+# Cancel with confirmation
+hp job cancel job-12345
+
+# Cancel with reason
+hp job cancel job-12345 --reason "Build timeout"
+
+# Force cancel without confirmation
+hp job cancel job-12345 --force
+```
+
+### job describe
+Show comprehensive information about a job (similar to kubectl describe).
+
+```bash
+hp job describe <job-id> [options]
+```
+
+**Arguments:**
+- `job-id`: ID of the job
+
+**Options:**
+- `--output, -o`: Output format (text, json)
+
+**Examples:**
+```bash
+# Detailed job information
+hp job describe job-12345
+
+# JSON output
+hp job describe job-12345 -o json
+```
+
+### job exec 🚧
+Execute a command in a job's execution context.
+
+```bash
+hp job exec <job-id> [options] -- <command>
+```
+
+**Arguments:**
+- `job-id`: ID of the running job
+- `command`: Command to execute
+
+**Options:**
+- `-i, --stdin`: Pass stdin to the container
+- `-t, --tty`: Allocate a pseudo-TTY
+
+**Examples:**
+```bash
+# Execute command in job context
+hp job exec job-12345 -- ls -la
+
+# Interactive command execution
+hp job exec job-12345 -it -- /bin/bash
+```
+
+### job shell 🚧
+Start an interactive shell in a job's execution context.
+
+```bash
+hp job shell <job-id> [options]
+```
+
+**Arguments:**
+- `job-id`: ID of the running job
+
+**Options:**
+- `--shell`: Shell to use (default: /bin/bash)
+
+**Examples:**
+```bash
+# Start interactive shell
+hp job shell job-12345
+
+# Use specific shell
+hp job shell job-12345 --shell /bin/zsh
 ```
 
 ## Worker Commands
@@ -367,6 +481,74 @@ hp worker status <worker-id>
 hp worker status worker-123
 ```
 
+### worker describe
+Show comprehensive information about a worker (similar to kubectl describe).
+
+```bash
+hp worker describe <worker-id> [options]
+```
+
+**Arguments:**
+- `worker-id`: ID of the worker
+
+**Options:**
+- `--output, -o`: Output format (text, json)
+
+**Examples:**
+```bash
+# Detailed worker information
+hp worker describe worker-123
+
+# JSON output
+hp worker describe worker-123 -o json
+```
+
+### worker exec 🚧
+Execute a command in a worker.
+
+```bash
+hp worker exec <worker-id> [options] -- <command>
+```
+
+**Arguments:**
+- `worker-id`: ID of the worker
+- `command`: Command to execute
+
+**Options:**
+- `-i, --stdin`: Pass stdin to the container
+- `-t, --tty`: Allocate a pseudo-TTY
+
+**Examples:**
+```bash
+# Execute command in worker
+hp worker exec worker-123 -- ls -la
+
+# Interactive command execution
+hp worker exec worker-123 -it -- /bin/bash
+```
+
+### worker shell 🚧
+Start an interactive shell in a worker.
+
+```bash
+hp worker shell <worker-id> [options]
+```
+
+**Arguments:**
+- `worker-id`: ID of the worker
+
+**Options:**
+- `--shell`: Shell to use (default: /bin/bash)
+
+**Examples:**
+```bash
+# Start interactive shell
+hp worker shell worker-123
+
+# Use specific shell
+hp worker shell worker-123 --shell /bin/zsh
+```
+
 ## Template Commands
 
 ### template list
@@ -393,38 +575,70 @@ hp template list --type docker
 Create a new worker template.
 
 ```bash
-hp template create <name> [options]
+hp template create [options]
 ```
 
-**Arguments:**
-- `name`: Template name
-
 **Options:**
-- `--file, -f`: Template definition file
-- `--type`: Template type (docker, kubernetes)
-- `--image`: Container image
-- `--cpu`: CPU requirements
-- `--memory`: Memory requirements
+- `--name`: Template name (required)
+- `--description`: Template description (required)
+- `--type`: Template type (default: pipeline)
+- `--file, -f`: Template definition file (JSON/YAML) (required)
+- `--dry-run`: Validate template without creating
 
 **Examples:**
 ```bash
 # Create from file
-hp template create my-template -f template.yaml
+hp template create --name my-template --description "My custom template" -f template.json
 
-# Create Docker template
-hp template create node-template --type docker --image node:18 --cpu 1 --memory 2Gi
+# Create with dry-run validation
+hp template create --name test-template --description "Test template" -f template.json --dry-run
+
+# Create different type
+hp template create --name docker-template --description "Docker template" --type docker -f docker-template.json
 ```
 
 ### template show
 Show detailed information about a template.
 
 ```bash
-hp template show <name>
+hp template show <template-id> [options]
 ```
+
+**Arguments:**
+- `template-id`: ID of the template
+
+**Options:**
+- `--output, -o`: Output format (text, json)
 
 **Examples:**
 ```bash
-hp template show default-docker-worker
+# Show template details
+hp template show template-12345
+
+# JSON output
+hp template show template-12345 -o json
+```
+
+### template describe
+Show comprehensive information about a template (similar to kubectl describe).
+
+```bash
+hp template describe <template-id> [options]
+```
+
+**Arguments:**
+- `template-id`: ID of the template
+
+**Options:**
+- `--output, -o`: Output format (text, json)
+
+**Examples:**
+```bash
+# Detailed template information
+hp template describe template-12345
+
+# JSON output
+hp template describe template-12345 -o json
 ```
 
 ## Docker Integration Commands

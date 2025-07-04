@@ -1,425 +1,434 @@
-# Hodei-Pipelines: Distributed Pipeline Orchestrator
+# 🚀 Hodei Pipelines
 
+<div align="center">
 
-**Hodei-Pipelines** is a modern, distributed, and scalable system for orchestrating and executing job pipelines. Built with Kotlin and gRPC, it leverages a clean, hexagonal architecture to ensure maintainability, testability, and separation of concerns.
+**Enterprise-Grade Distributed Pipeline Orchestrator**
 
-## ✨ Key Features
+[![Kotlin](https://img.shields.io/badge/kotlin-2.2.0-blue.svg?logo=kotlin)](https://kotlinlang.org)
+[![gRPC](https://img.shields.io/badge/gRPC-1.66.0-green.svg?logo=grpc)](https://grpc.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/rubentxu/hodei-pipelines)
+[![CLI](https://img.shields.io/badge/CLI-hp%20v1.0.0-purple.svg)](./docs/QUICK_START_DOCKER.md)
 
-- **Distributed Job Execution**: Run jobs (scripts or commands) on a pool of scalable workers.
-- **Strategy Pattern for Job Execution**: Multiple execution strategies including Kotlin scripting, compiler-embeddable, and system commands.
-- **Pipeline DSL**: Jenkins-like Pipeline DSL for defining complex build pipelines with stages, steps, and parallel execution.
-- **Security Sandbox**: Configurable security policies with dangerous code detection and prevention.
-- **Library Management**: Dynamic JAR loading and dependency management for pipeline extensions.
-- **Extension System**: Third-party plugin support for extending pipeline functionality.
-- **Event Streaming**: Real-time pipeline events via gRPC for monitoring and integration.
-- **Artifact Management**: Advanced artifact caching, compression, and transfer capabilities.
-- **Hexagonal Architecture**: A clean separation between the core domain logic and infrastructure details (e.g., databases, network protocols).
-- **gRPC-based Communication**: Efficient and strongly-typed communication between the central server and workers using Protocol Buffers.
-- **Dynamic Worker Pools**: Manage and scale pools of workers based on configurable policies.
-- **Advanced Job Scheduling**: Sophisticated scheduling strategies to assign jobs to the most suitable workers.
-- **Automatic Worker Scaling**: Policies for automatically scaling worker resources up or down based on demand, inspired by Kubernetes.
+---
 
-## 🏛️ Architecture Overview
+*A modern, scalable, and enterprise-grade distributed job orchestration system built with Kotlin, gRPC, and hexagonal architecture.*
 
-The project follows a strict **Hexagonal (Ports and Adapters) Architecture**. This isolates the core business logic from external concerns.
+</div>
 
-- **`core`**: Contains the heart of the application.
-  - **`domain`**: Defines the business entities, rules, and the all-important **ports** (interfaces) that the domain needs to function.
-  - **`application`**: Implements the use cases that orchestrate the domain logic.
-  - **`infrastructure`**: Provides in-memory implementations of the ports for testing and standalone operation.
-- **`backend`**: The central server component. It contains gRPC adapters that expose the application's use cases to the network.
-- **`worker`**: The client component that registers with the server, receives jobs, executes them, and reports back the results.
+## 📋 Table of Contents
 
-For a deep dive into the architecture, component diagrams, and domain model, please see the [**System Patterns Document**](./docs/systemPatterns.md).
+- [🌟 Key Features](#-key-features)
+- [🏗️ Architecture](#️-architecture)
+- [🚀 Quick Start](#-quick-start)
+- [💻 Enterprise CLI](#-enterprise-cli)
+- [📊 Main Flow](#-main-flow)
+- [🔧 Technologies](#-technologies)
+- [📚 Documentation](#-documentation)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
 
-## 🔧 Pipeline DSL Features
+## 🌟 Key Features
 
-### Kotlin Script Execution
-Execute Kotlin scripts with full access to the Pipeline DSL:
+### 🎯 **Enterprise Orchestration**
+- **Distributed execution** of jobs on scalable worker pools
+- **API-First architecture** with complete OpenAPI specification
+- **Efficient gRPC communication** with multiplexed bidirectional streams
+- **Interchangeable scheduling strategies** (Round Robin, Least Loaded, Bin Packing, Greedy Best Fit)
 
-```kotlin
-pipeline {
-    stage("Build") {
-        script {
-            println("Building the project...")
-            sh("./gradlew build")
-        }
-    }
-    stage("Test") {
-        parallel {
-            task("Unit Tests") {
-                sh("./gradlew test")
-            }
-            task("Integration Tests") {
-                sh("./gradlew integrationTest")
-            }
-        }
-    }
-}
+### 🔐 **Security & Governance**
+- **Complete IAM/RBAC system** with roles, permissions, and auditing
+- **Multi-tenancy** with namespaces and per-project quotas
+- **JWT and Service Accounts** for authentication and authorization
+- **Complete audit logs** for compliance and traceability
+
+### ⚡ **High Performance**
+- **Native standalone binary** with no JVM dependencies (58MB)
+- **Real-time streaming** of logs and events via WebSocket/SSE
+- **Event Sourcing** for consistency and fault recovery
+- **Dynamic worker pools** with intelligent auto-scaling
+
+### 🛠️ **Pipeline as Code**
+- **Powerful Kotlin DSL** for defining complex pipelines
+- **Parallel stage execution** with advanced synchronization
+- **Reusable templates** with versioning and validation
+- **Artifact management** with caching and optimized transfer
+
+### 🌐 **Infrastructure Agnostic**
+- **Multi-platform support**: Kubernetes, Docker, Cloud VMs
+- **IInstanceManager and IResourceMonitor abstractions** for any provider
+- **Flexible deployment**: Modular monolith ready for microservices
+- **Advanced monitoring** with Prometheus metrics and OpenTelemetry
+
+## 🏗️ Architecture
+
+Hodei Pipelines follows a **hexagonal architecture (ports and adapters)** with **bounded contexts** inspired by Domain-Driven Design:
+
+```mermaid
+graph TB
+    subgraph "Client & Interfaces"
+        CLI[🖥️ CLI hp<br/>35+ commands]
+        API[🌐 REST API<br/>OpenAPI 3.0]
+        WS[🔄 WebSocket/SSE<br/>Streaming]
+    end
+    
+    subgraph "Application Core"
+        ORCH[🎯 Orchestrator<br/>Queue Management]
+        SCHED[📊 Scheduler<br/>Intelligent Placement]
+        EXEC[⚙️ ExecutionEngine<br/>Lifecycle]
+    end
+    
+    subgraph "Bounded Contexts"
+        JOB[📋 Job Management<br/>Lifecycles & Queues]
+        EXEC_CTX[🔄 Execution Context<br/>Real-time Processing]
+        RES[🏊 Resource Management<br/>Pools & Workers]
+        TMPL[📦 Template Management<br/>DSL & Versioning]
+        SEC[🔐 Security & IAM<br/>RBAC & Audit]
+    end
+    
+    subgraph "Infrastructure"
+        K8S[☸️ Kubernetes<br/>IInstanceManager]
+        DOCKER[🐳 Docker<br/>IInstanceManager]
+        CLOUD[☁️ Cloud VMs<br/>IInstanceManager]
+    end
+    
+    subgraph "Workers"
+        W1[👷 Worker 1<br/>gRPC Client]
+        W2[👷 Worker 2<br/>gRPC Client]
+        WN[👷 Worker N<br/>gRPC Client]
+    end
+    
+    CLI --> API
+    API --> ORCH
+    WS --> EXEC
+    
+    ORCH --> SCHED
+    SCHED --> EXEC
+    EXEC --> RES
+    
+    ORCH -.-> JOB
+    EXEC -.-> EXEC_CTX
+    SCHED -.-> RES
+    API -.-> TMPL
+    API -.-> SEC
+    
+    RES --> K8S
+    RES --> DOCKER
+    RES --> CLOUD
+    
+    K8S --> W1
+    DOCKER --> W2
+    CLOUD --> WN
+    
+    W1 -.->|gRPC Stream| EXEC
+    W2 -.->|gRPC Stream| EXEC
+    WN -.->|gRPC Stream| EXEC
+    
+    classDef client fill:#e1f5fe
+    classDef core fill:#f3e5f5
+    classDef context fill:#e8f5e8
+    classDef infra fill:#fff3e0
+    classDef worker fill:#fce4ec
+    
+    class CLI,API,WS client
+    class ORCH,SCHED,EXEC core
+    class JOB,EXEC_CTX,RES,TMPL,SEC context
+    class K8S,DOCKER,CLOUD infra
+    class W1,W2,WN worker
 ```
 
-### Execution Strategies
-- **KotlinScriptingStrategy**: Execute Kotlin scripts using the Kotlin Scripting API
-- **CompilerEmbeddableStrategy**: Compile and execute Kotlin code using kotlin-compiler-embeddable
-- **SystemCommandStrategy**: Execute system commands and shell scripts
+### 🔄 Separation of Responsibilities
 
-### Security Features
-- **Dangerous Code Detection**: Automatically detects and prevents execution of potentially harmful code patterns
-- **Configurable Security Policies**: Fine-grained control over what operations are allowed
-- **Sandboxed Execution**: Isolated execution environment for scripts
+- **Orchestrator**: Job queue management and enqueuing decisions
+- **Scheduler**: Optimal placement algorithms with interchangeable strategies
+- **ExecutionEngine**: Complete execution lifecycle management
+- **ResourceManager**: Heterogeneous infrastructure abstraction
+- **Workers**: Distributed execution with bidirectional communication
 
-### Library Management
-- **Dynamic JAR Loading**: Load and manage external JAR dependencies at runtime
-- **Version Conflict Resolution**: Handle dependency conflicts automatically
-- **Extension Loading**: Support for third-party extensions and plugins
+## 🚀 Quick Start
 
-## 🛠️ Technology Stack
+### 📋 Prerequisites
 
-- **Language**: [Kotlin](https://kotlinlang.org/) with Coroutines for asynchronous programming.
-- **Script Execution**: Kotlin Scripting API and kotlin-compiler-embeddable for dynamic code execution.
-- **Communication**: [gRPC](https://grpc.io/) with [Protocol Buffers](https://developers.google.com/protocol-buffers) for high-performance RPC.
-- **Build System**: [Gradle](https://gradle.org/) with the Kotlin DSL.
-- **Testing**: JUnit 5, Mockito, and embedded gRPC servers for comprehensive integration testing.
-- **Logging**: [KotlinLogging](https://github.com/MicroUtils/kotlin-logging).
-- **Security**: Custom security sandbox with configurable policies.
-- **Compression**: GZIP support for artifact transfer optimization.
+**For standard execution:**
+- Java 17+ 
+- Docker installed and running
+- Gradle (no wrapper as per project configuration)
 
-For more details on the technology and tools, refer to the [**Tech Context Document**](./docs/techContext.md).
+**For native binary (recommended):**
+- GraalVM 21+ (optional - pre-compiled binaries available)
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- JDK 17 or higher.
-- Gradle.
-
-### Build
-
-To build the entire project and run all checks, execute the following command from the root directory:
+### ⚡ Option 1: Native Standalone Binary (Recommended)
 
 ```bash
-./gradlew build
+# Compile ultra-fast native binary
+gradle :hodei-pipelines-cli:nativeCompile
+
+# Create complete distribution
+gradle :hodei-pipelines-cli:createNativeDistributions
+
+# Install globally
+sudo cp hodei-pipelines-cli/build/distributions/native/linux-x64/hp /usr/local/bin/
+
+# Verify installation - instant startup
+hp version
 ```
 
-### Run
+**Native binary benefits:**
+- ⚡ **Ultra-fast startup** (no JVM overhead)
+- 📦 **58MB self-contained** (no Java required)
+- 🚀 **Single-file distribution**
+- 🔧 **All CLI features** (35+ commands)
 
-1.  **Start the Server**: Run the `main` function in `backend/application/src/main/kotlin/dev/rubentxu/hodei/pipelines/application/HodeiPipelinesServer.kt`.
-2.  **Start a Worker**: Run the `main` function in `worker/application/src/main/kotlin/dev/rubentxu/hodei/pipelines/worker/application/PipelineWorkerApp.kt`.
-
-## 🧪 Testing the Pipeline DSL
-
-### Running the Test Suite
-
-Execute all tests to verify functionality:
+### 🐳 Option 2: Quick Start with Docker
 
 ```bash
-# Run all tests
-./gradlew test
+# 1. Build project
+gradle clean build -x test
 
-# Run only worker tests  
-./gradlew :worker:infrastructure:test
+# 2. Start orchestrator
+gradle :orchestrator:run
+# Available at http://localhost:8080
 
-# Run tests with detailed output
-./gradlew test --info
+# 3. Configure CLI (in separate terminal)
+gradle :hodei-pipelines-cli:assemble
+cd hodei-pipelines-cli/build/distributions
+tar -xf hodei-pipelines-cli.tar
+./hodei-pipelines-cli/bin/hp login http://localhost:8080 -u admin -p admin123
+
+# 4. Verify system status
+hp health && hp status
 ```
 
-### Manual Testing with Examples
+For a complete step-by-step guide: **[📖 Docker Quick Start Guide](./docs/QUICK_START_DOCKER.md)**
 
-#### 1. Basic Pipeline Example
+## 💻 Enterprise CLI
 
-Create a simple Kotlin script file `test-pipeline.kts`:
+The `hp` CLI provides a complete interface for distributed orchestration management, comparable to enterprise tools like OpenShift CLI.
 
-```kotlin
-pipeline {
-    stage("Hello World") {
-        script {
-            println("Hello from Hodei-Pipelines!")
-            sh("echo 'System info:'")
-            sh("uname -a")
-        }
-    }
-}
-```
-
-#### 2. Multi-Stage Pipeline
-
-```kotlin
-pipeline {
-    stage("Preparation") {
-        script {
-            println("Setting up environment...")
-            setEnv("BUILD_NUMBER", "123")
-            setEnv("PROJECT_NAME", "hodei-pipelines")
-        }
-    }
-    
-    stage("Build") {
-        parallel {
-            task("Compile") {
-                println("Compiling sources...")
-                sh("echo 'Compiling...'")
-            }
-            task("Resources") {
-                println("Processing resources...")
-                sh("echo 'Processing resources...'")
-            }
-        }
-    }
-    
-    stage("Test") {
-        script {
-            println("Running tests for project: ${env("PROJECT_NAME")}")
-            println("Build number: ${env("BUILD_NUMBER")}")
-            sh("echo 'All tests passed!'")
-        }
-    }
-}
-```
-
-#### 3. Error Handling Pipeline
-
-```kotlin
-pipeline {
-    stage("Safe Operations") {
-        try {
-            script {
-                println("Performing safe operations...")
-                sh("echo 'This will succeed'")
-            }
-        } catch (e: Exception) {
-            println("Unexpected error: ${e.message}")
-        }
-    }
-    
-    stage("Error Demonstration") {
-        try {
-            script {
-                // This will be blocked by security
-                System.exit(1)
-            }
-        } catch (e: SecurityException) {
-            println("Security policy prevented dangerous operation: ${e.message}")
-        }
-    }
-}
-```
-
-### Integration Testing
-
-The project includes comprehensive integration tests that demonstrate real usage:
-
-#### Running Integration Tests
+### 🎯 Main Commands
 
 ```bash
-# Run specific integration test
-./gradlew :worker:infrastructure:test --tests "*MinimalIntegrationTest*"
+# 🔐 Authentication and contexts
+hp login http://orchestrator:8080 --username admin --password secret
+hp whoami                                    # View current user
+hp config get-contexts                       # List contexts
+hp config use-context production             # Switch context
 
-# Run worker registration tests
-./gradlew :worker:infrastructure:test --tests "*WorkerRegistrationIntegrationTest*"
+# 📋 Job Management
+hp job submit pipeline.kts --name my-job     # Submit job
+hp job status job-123                        # Job status
+hp job logs job-123 --follow                 # Real-time logs
+hp job describe job-123                      # Detailed information
+hp job cancel job-123 --reason "timeout"     # Cancel job
 
-# Run execution strategy tests  
-./gradlew :worker:infrastructure:test --tests "*JobExecutionStrategyTest*"
+# 🏊 Resource Pool Management
+hp pool list                                 # List pools
+hp pool create --name gpu-pool --type k8s    # Create pool
+hp pool describe pool-123                    # Detailed information
+hp pool delete pool-123 --force              # Delete pool
+
+# 👷 Worker Management
+hp worker list --pool gpu-pool               # List workers
+hp worker describe worker-456                # Worker status
+hp worker exec worker-456 -- ps aux          # Execute command
+hp worker shell worker-456                   # Interactive shell
+
+# 📦 Template Management
+hp template list --type docker               # List templates
+hp template create --file template.json      # Create template
+hp template describe template-789            # View details
+hp template validate --file template.json    # Validate template
+
+# 📊 Monitoring and Health
+hp health                                    # Orchestrator health
+hp status                                    # Complete system status
+hp version                                   # Version information
 ```
 
-#### Test Coverage Report
+### 🔥 Complete Heavy Job Example
 
-Generate test coverage reports:
+Create custom template and execute computationally intensive job:
 
 ```bash
-./gradlew test jacocoTestReport
-open worker/infrastructure/build/reports/jacoco/test/html/index.html
-```
-
-### Testing Different Execution Strategies
-
-#### 1. KotlinScriptingStrategy Test
-
-```kotlin
-// This is tested automatically, but you can see it in:
-// worker/infrastructure/src/test/kotlin/.../execution/JobExecutionStrategyTest.kt
-
-@Test
-fun `should execute Kotlin script using KotlinScriptingStrategy`() = runTest {
-    val script = """
-        pipeline {
-            stage("Kotlin Script Test") {
-                script {
-                    println("Testing Kotlin Scripting Strategy")
-                    val result = (1..5).sum()
-                    println("Sum of 1-5: ${'$'}result")
-                }
-            }
-        }
-    """.trimIndent()
-    
-    // Test execution...
+# 1. Create template for heavy computation
+cat > heavy-compute.json << 'EOF'
+{
+  "name": "heavy-compute-worker",
+  "type": "docker",
+  "config": {
+    "image": "openjdk:17-jdk-slim",
+    "cpus": 2.0,
+    "memory": "4GB"
+  }
 }
+EOF
+
+hp template create --name heavy-compute --file heavy-compute.json
+
+# 2. Create dedicated pool
+hp pool create --name compute-pool --type docker --max-workers 3
+
+# 3. Submit intensive job
+hp job submit heavy-pipeline.kts \
+  --name "fibonacci-stress-test" \
+  --priority high \
+  --pool compute-pool \
+  --timeout 600
+
+# 4. Real-time monitoring (multiple terminals)
+hp job logs $JOB_ID --follow     # Terminal 1: Logs
+watch "hp job status $JOB_ID"    # Terminal 2: Status
+watch "hp pool describe compute-pool"  # Terminal 3: Pool
 ```
 
-#### 2. Security Policy Testing
+**See complete example**: [🔥 Heavy Job Execution with Monitoring](./docs/QUICK_START_DOCKER.md#complete-example-execute-a-heavy-job-with-monitoring)
 
-```kotlin
-@Test  
-fun `should block dangerous code patterns`() = runTest {
-    val dangerousScript = """
-        pipeline {
-            stage("Dangerous Operations") {
-                script {
-                    System.exit(1) // This should be blocked
-                }
-            }
-        }
-    """.trimIndent()
+## 📊 Main Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client/CLI
+    participant API as REST API
+    participant O as Orchestrator
+    participant S as Scheduler
+    participant E as ExecutionEngine
+    participant W as Worker
+    participant M as ResourceMonitor
+
+    C->>API: hp job submit pipeline.kts
+    API->>O: submitJob(job)
+    O->>O: enqueue(job)
     
-    // Verify security exception is thrown...
-}
-```
-
-### Performance Testing
-
-#### Benchmark Pipeline Execution
-
-```bash
-# Run performance tests
-./gradlew :worker:infrastructure:test --tests "*PerformanceTest*"
-
-# Test with larger scripts
-./gradlew :worker:infrastructure:test -Dtest.script.size=large
-```
-
-#### Memory Usage Testing
-
-```kotlin
-// Monitor memory usage during pipeline execution
-pipeline {
-    stage("Memory Test") {
-        script {
-            val runtime = Runtime.getRuntime()
-            println("Used memory: ${(runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024} MB")
-            
-            // Create some objects to test memory
-            val largeList = (1..10000).toList()
-            println("Created list with ${largeList.size} elements")
-        }
-    }
-}
-```
-
-### Debugging and Troubleshooting
-
-#### Enable Debug Logging
-
-Add to your test configuration:
-
-```kotlin
-// In test setup
-System.setProperty("kotlin.script.classpath", System.getProperty("java.class.path"))
-System.setProperty("logging.level.dev.rubentxu.hodei.pipelines", "DEBUG")
-```
-
-#### Test Event Streaming
-
-```kotlin
-@Test
-fun `should emit pipeline events`() = runTest {
-    val events = mutableListOf<JobExecutionEvent>()
+    Note over O,S: Scheduling Process
+    O->>S: findPlacement(job)
+    S->>M: getResourceUtilization(pools)
+    M-->>S: real-time metrics
+    S->>S: apply strategy (LeastLoaded)
+    S-->>O: selected ResourcePool
     
-    // Collect events during execution
-    executor.execute(job, workerId).collect { event ->
-        events.add(event)
-        println("Event: ${event::class.simpleName}")
-    }
+    O->>E: executeJob(job, pool)
+    O->>O: dequeue(job)
     
-    // Verify events were emitted
-    assertThat(events).hasSize(expectedEventCount)
-}
-```
-
-### Load Testing
-
-#### Multiple Workers
-
-```bash
-# Start multiple workers for load testing
-./gradlew :worker:infrastructure:test --tests "*MultipleWorkersTest*"
-```
-
-#### Concurrent Pipeline Execution
-
-```kotlin
-@Test
-fun `should handle concurrent pipeline execution`() = runTest {
-    val workers = (1..5).map { createWorker("worker-$it") }
-    val jobs = (1..10).map { createTestJob("job-$it") }
+    Note over E,W: Provisioning
+    E->>E: provisionWorker(pool)
+    W->>E: register() via gRPC
+    E->>W: assignExecution(job)
     
-    // Execute jobs concurrently
-    workers.forEach { it.start() }
-    // Submit jobs and verify execution
-}
-```
-
-### Monitoring Test Results
-
-#### Real-time Test Output
-
-```bash
-# Watch test execution in real-time
-./gradlew test --continuous
-
-# Run tests with gradle daemon for faster execution
-./gradlew test --daemon
-```
-
-#### Test Reports
-
-After running tests, view detailed reports:
-
-```bash
-# Open test report in browser (Linux/macOS)
-open worker/infrastructure/build/reports/tests/test/index.html
-
-# Or check the terminal output for direct file path
-```
-
-### Custom Test Scenarios
-
-Create your own test scenarios by extending the existing test infrastructure:
-
-```kotlin
-class CustomPipelineTest : IntegrationTestBase() {
+    Note over W,C: Execution and Streaming
+    loop Pipeline Execution
+        W-->>E: statusUpdate(RUNNING)
+        W-->>E: logChunk(stdout/stderr)
+        E-->>C: streaming logs via WebSocket
+    end
     
-    @Test
-    fun `should execute custom pipeline scenario`() = runTest {
-        val customScript = """
-            pipeline {
-                // Your custom pipeline logic here
-            }
-        """.trimIndent()
-        
-        val result = executeScript(customScript)
-        // Assert your expectations
-    }
-}
+    W->>E: executionResult(SUCCESS)
+    E->>API: updateJobStatus(COMPLETED)
+    E-->>C: job completed
 ```
 
-This comprehensive testing approach ensures that all Pipeline DSL features work correctly and provides examples for users to understand the system capabilities.
+### 🎯 Scheduling Strategies
 
-## 📚 In-Depth Documentation
+| Strategy | Description | Use Case |
+|----------|-------------|----------|
+| **🔄 Round Robin** | Equal distribution across pools | Homogeneous workloads |
+| **📊 Least Loaded** | Lowest overall utilization (CPU+Mem+Jobs) | Optimal general usage |
+| **🎯 Greedy Best Fit** | Best resource fit | Maximize throughput |
+| **📦 Bin Packing** | Consolidation in fewer pools | Cost optimization |
 
-This project uses a "Registro de Conocimiento" (Knowledge Registry) to maintain comprehensive documentation. All detailed documentation is located in the `/docs` directory.
+## 🔧 Technologies
 
-- **[Project Brief](./docs/projectbrief.md)**: High-level goals and requirements.
-- **[Product Context](./docs/productContext.md)**: The "why" behind the project and user experience goals.
-- **[System Patterns](./docs/systemPatterns.md)**: Detailed architecture, diagrams, and design patterns.
-- **[Pipeline DSL Guide](./docs/pipeline-dsl-guide.md)**: Comprehensive guide to the Pipeline DSL features and usage.
-- **[Project Structure](./docs/project_structure.md)**: A complete breakdown of all modules and key directories.
-- **[Tech Context](./docs/techContext.md)**: Details on the technology stack and development tools.
-- **[Active Context](./docs/activeContext.md)**: Current work focus, next steps, and active decisions.
+### 🏗️ Main Stack
+- **[Kotlin 2.2.0](https://kotlinlang.org)** - Primary language with coroutines
+- **[gRPC 1.66.0](https://grpc.io)** - Efficient bidirectional communication
+- **[Ktor 3.2.0](https://ktor.io)** - Web framework and HTTP client
+- **[GraalVM Native Image](https://www.graalvm.org)** - Native compilation
+- **[Gradle](https://gradle.org)** - Build system with Kotlin DSL
+
+### 🔧 Infrastructure
+- **Protocol Buffers** - Efficient serialization
+- **Kotlinx Serialization** - JSON/YAML processing  
+- **Kotlinx Coroutines** - Asynchronous programming
+- **Kotlinx DateTime** - Time management
+- **WebSocket/SSE** - Real-time streaming
+
+### 📊 Observability
+- **OpenTelemetry** - Distributed tracing
+- **Micrometer + Prometheus** - System metrics
+- **Logback** - Structured logging
+- **Event Sourcing** - Immutable auditing
+
+### 🧪 Testing
+- **Kotest** - Testing framework
+- **Mockk** - Mocking for Kotlin
+- **TestContainers** - Integration testing
+- **Embedded gRPC** - Communication testing
+
+## 📚 Documentation
+
+### 📖 User Guides
+- **[🚀 Docker Quick Start Guide](./docs/QUICK_START_DOCKER.md)** - Complete step-by-step guide
+- **[💻 Complete CLI Reference](./docs/CLI_REFERENCE_HP.md)** - All `hp` commands
+- **[🗺️ CLI Roadmap](./docs/CLI_ROADMAP.md)** - Comparison with enterprise tools
+
+### 🏗️ Technical Documentation  
+- **[📋 Project PRD](./PRD-proyecto.md)** - Requirements and complete architecture
+- **[🎯 Project Brief](./docs/projectbrief.md)** - Objectives and context
+- **[🏛️ System Patterns](./docs/systemPatterns.md)** - Detailed architecture
+- **[🔧 Tech Context](./docs/techContext.md)** - Stack and tools
+
+### 🎨 DSL and Development
+- **[📝 Pipeline DSL Guide](./docs/pipeline-dsl-guide.md)** - Syntax and examples
+- **[📁 Project Structure](./docs/project_structure.md)** - Code organization
+- **[⚡ Active Context](./docs/activeContext.md)** - Current state and next steps
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please refer to the `CONTRIBUTING.md` file for guidelines. (Note: This file is a placeholder).
+Contributions are welcome! 
+
+### 🛠️ Development Setup
+
+```bash
+# Clone repository
+git clone https://github.com/rubentxu/hodei-pipelines.git
+cd hodei-pipelines
+
+# Build and run tests
+gradle clean build test
+
+# Run integration tests
+gradle :orchestrator:test --tests "*IntegrationTest*"
+
+# Verify code style
+gradle detekt ktlintCheck
+```
+
+### 📋 Contribution Standards
+
+- **🏗️ Hexagonal Architecture** - Respect ports and adapters
+- **🧪 TDD** - Tests first, implementation after  
+- **📝 Conventional Commits** - `feat:`, `fix:`, `docs:`, etc.
+- **🔧 SOLID + Clean Code** - Design principles
+- **📖 Documentation** - Update relevant docs
+
+### 🎯 Contribution Areas
+
+- 🌐 **New infrastructure adapters** (AWS, Azure, GCP)
+- 🔧 **Custom scheduling strategies**
+- 📊 **Advanced metrics and dashboards**  
+- 🔐 **Security integrations** (LDAP, OAuth2)
+- 🎨 **Pipeline DSL improvements**
+- 📱 **Web interface** (SPA with REST API)
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details. (Note: This file is a placeholder).
+This project is licensed under the **MIT License**. See [LICENSE](./LICENSE) for details.
+
+---
+
+<div align="center">
+
+**🚀 Hodei Pipelines** - *Modern distributed orchestration for cloud-native ecosystems*
+
+[Documentation](./docs/) • [CLI Reference](./docs/CLI_REFERENCE_HP.md) • [Quick Start](./docs/QUICK_START_DOCKER.md) • [Architecture](./PRD-proyecto.md)
+
+</div>

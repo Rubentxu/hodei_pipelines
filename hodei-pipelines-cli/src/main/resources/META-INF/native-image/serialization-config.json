@@ -1,0 +1,62 @@
+[
+  {
+    "name": "dev.rubentxu.hodei.cli.client.HealthResponse"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.ComponentHealth"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.VersionResponse"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.LoginRequest"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.LoginResponse"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.AuthToken"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.User"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.UserInfo"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.ResourcePool"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.CreatePoolRequest"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.PoolCapacity"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.PoolUtilization"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.Job"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.JobSubmissionRequest"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.JobSubmissionResponse"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.JobLogsResponse"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.LogEntry"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.Worker"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.Template"
+  },
+  {
+    "name": "dev.rubentxu.hodei.cli.client.CreateTemplateRequest"
+  }
+]

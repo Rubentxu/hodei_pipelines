@@ -2,7 +2,7 @@ package dev.rubentxu.hodei.cli.client
 
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
+import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.plugins.websocket.*
@@ -29,13 +29,9 @@ class HodeiApiClient(
     private val verbose: Boolean = false
 ) {
     
-    private val httpClient = HttpClient(CIO) {
+    private val httpClient = HttpClient(Java) {
         install(ContentNegotiation) {
-            json(Json {
-                prettyPrint = true
-                isLenient = true
-                ignoreUnknownKeys = true
-            })
+            json(JsonConfig.json)
         }
         
         if (verbose) {

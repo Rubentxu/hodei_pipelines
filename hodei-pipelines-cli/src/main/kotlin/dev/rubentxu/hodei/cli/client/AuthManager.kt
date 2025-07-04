@@ -36,8 +36,11 @@ class AuthManager(
             val contextName = extractContextName(url)
             val newContext = Context(
                 url = url,
-                user = loginResponse.user.username,
-                token = loginResponse.token
+                user = loginResponse.user?.username ?: "unknown",
+                token = AuthToken(
+                    accessToken = loginResponse.token,
+                    tokenType = "Bearer"
+                )
             )
             
             val updatedConfig = config.copy(
